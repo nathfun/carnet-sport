@@ -518,7 +518,10 @@ function addActSheet(kind) {
     <div class="trio"><label>Distance (km)<input id="aakm" inputmode="decimal" placeholder="ex. 7,5"></label><label>Durée<input id="aat" placeholder="${kind === 'run' ? 'ex. 42:30 (min:s)' : 'ex. 2:15 (h:min)'}"></label></div>
     <div class="trio"><label>Dénivelé + (m)<input id="aae" inputmode="numeric" placeholder="facultatif"></label><label>FC moyenne<input id="aahr" inputmode="numeric" placeholder="facultatif"></label></div>
     <label style="margin-top:8px">Nom<input id="aan" placeholder="${kind === 'run' ? 'Course à pied' : 'Sortie vélo'}"></label>
-    <button class="p wide" style="margin-top:12px" data-act="saveact">Enregistrer</button><button class="ghost wide" style="margin-top:8px" data-close>Annuler</button>`);
+    <button class="p wide" style="margin-top:12px" data-act="saveact">Enregistrer</button>
+    <div class="sec">Ou importer un fichier</div><p class="tiny">Depuis ta montre (Garmin, Polar, Coros…), Strava ou une appli : fichiers .gpx, .tcx ou .fit. Tu obtiens la carte, les temps au km et l'analyse complète.</p>
+    <label class="btn wide">📁 Importer un fichier<input type="file" accept=".gpx,.tcx,.fit,application/gpx+xml" multiple hidden data-imp="1"></label>
+    <button class="ghost wide" style="margin-top:8px" data-close>Annuler</button>`);
 }
 function saveAct() {
   const v = id => ($('#' + id) || {}).value || '', kind = v('aak'), km = num(v('aakm')), tp = v('aat').trim().split(/[:h']/).map(x => parseInt(x) || 0);
@@ -554,7 +557,7 @@ function settingsInner() {
   <div class="pills">${[6, 7, 8].map(n => `<button class="${(window.DELOAD ? window.DELOAD.cfg().every : 7) === n ? 'sel' : ''}" data-ex="deloadevery" data-v="${n}">${n} semaines</button>`).join('')}</div>
   ${window.SYNC ? window.SYNC.html() : ''}
   <div class="sec">Aide</div><button class="wide" data-act="goto" data-v="guide">📖 Revoir le guide de l'app</button>
-  <div class="sec">Version</div><p class="tiny">Version 27 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
+  <div class="sec">Version</div><p class="tiny">Version 28 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
   <div class="sec">Sauvegarde</div>
   <p class="tiny">Copie de secours manuelle, utile si la synchro n'est pas activée. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
@@ -698,7 +701,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloaded) return; reloaded = true; if (!S.draft) location.reload(); else toast("Nouvelle version prête : elle s'appliquera à la prochaine ouverture"); });
 }
 
-window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid), ding, blip, unlockAudio, wakeOn, refreshRec, allEx, defaultProgram, prSession };
+window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid), ding, blip, unlockAudio, wakeOn, refreshRec, allEx, defaultProgram, prSession, checkBadges };
 window.CARNET_fillMedia = fillMedia;
 window.CARNET.media = { ready: () => idbReady, list: mediaFor, tx: mediaTx };
 if (!['home', 'workout', 'program', 'progress', 'tools', 'me', 'lib', 'exo', 'progs', 'ana', 'social', 'gen', 'guide'].includes(view)) view = 'home';

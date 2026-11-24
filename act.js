@@ -19,6 +19,7 @@ const CK = id => location.origin + '/__act/' + id;
 async function load(id) {
   if (mem.has(id)) return mem.get(id);
   let d = null;
+  if (String(id).startsWith('imp_')) { d = window.FILEIMP ? await window.FILEIMP.detailOf(id) : null; if (d) mem.set(id, d); return d; }
   try { const c = await caches.open('carnet-acts'), r = await c.match(CK(id)); if (r) d = await r.json(); } catch (e) { }
   if (!d && window.SYNC && window.SYNC.on() && navigator.onLine) {
     d = await window.SYNC.get('/strava/act/' + id);
@@ -127,7 +128,7 @@ function render(l, d) {
     ${sp.map((x, i) => { const v = spv[i]; return `<tr class="${i === fast ? 'fast' : i === slow && sp.length > 2 ? 'slow' : ''}"><td>${run ? (x.km < 0.97 ? fr(x.km, 2) : i + 1) : fr(sp.slice(0, i + 1).reduce((a, y) => a + y.km, 0), 0) + ' km'}</td><td><b>${run ? mmss(x.sec / x.km) : fr(v * 3600, 1)}</b>${run ? ' <small>/km</small>' : ' <small>km/h</small>'}</td><td class="sbar"><i style="width:${Math.max(8, v / vmx * 100)}%"></i></td><td>${x.elev > 0 ? '+' : ''}${x.elev} m</td>${sp.some(y => y.hr) ? `<td>${x.hr || '—'}</td>` : ''}</tr>`; }).join('')}</tbody></table>
     <p class="tiny">${run ? `Plus rapide : km ${fast + 1} en ${mmss(sp[fast].sec / sp[fast].km)}/km. ` : ''}La barre est d'autant plus longue que tu vas vite.${run && sp.length > 3 ? ' ' + splitVerdict(sp) : ''}</p></section>` : '';
   const eff = (d.efforts || []).filter(e => e.sec);
-  const effHtml = eff.length ? `<section class="tcard"><h2 class="h2s">Meilleurs efforts</h2><table class="efforts">${eff.map(e => `<tr><td>${esc(e.name.replace('1/2 mile', '½ mile'))}</td><td><b>${hms(e.sec)}</b></td><td class="mute">${mmss(e.sec / (e.dist / 1000))}/km</td><td>${e.pr === 1 ? '<span class="prb gold">🏆 Record</span>' : e.pr === 2 ? '<span class="prb">2ᵉ temps</span>' : e.pr === 3 ? '<span class="prb">3ᵉ temps</span>' : ''}</td></tr>`).join('')}</table><p class="tiny">Calculés par Strava sur cette sortie. « Record » = ton meilleur temps de tous les temps sur la distance.</p></section>` : '';
+  const effHtml = eff.length ? `<section class="tcard"><h2 class="h2s">Meilleurs efforts</h2><table class="efforts">${eff.map(e => `<tr><td>${esc(e.name.replace('1/2 mile', '½ mile'))}</td><td><b>${hms(e.sec)}</b></td><td class="mute">${mmss(e.sec / (e.dist / 1000))}/km</td><td>${e.pr === 1 ? '<span class="prb gold">🏆 Record</span>' : e.pr === 2 ? '<span class="prb">2ᵉ temps</span>' : e.pr === 3 ? '<span class="prb">3ᵉ temps</span>' : ''}</td></tr>`).join('')}</table><p class="tiny">${l && l.src === 'file' ? 'Tes meilleurs temps sur cette sortie, calculés depuis ton fichier.' : 'Calculés par Strava sur cette sortie. « Record » = ton meilleur temps de tous les temps sur la distance.'}</p></section>` : '';
   const hrT = s.hr.length ? zoneTimes(d, i => s.hr[i], Z.hr, 5) : null;
   const hrL = [`≤ ${Z.hr[0]}`, `${Z.hr[0] + 1}–${Z.hr[1]}`, `${Z.hr[1] + 1}–${Z.hr[2]}`, `${Z.hr[2] + 1}–${Z.hr[3]}`, `> ${Z.hr[3]}`];
   const pT = run && s.v.length && Z.pace ? zoneTimes(d, i => s.v[i] > 1.2 ? -1000 / s.v[i] : null, Z.pace.map(x => -x), 6) : null;
@@ -152,13 +153,13 @@ function splitVerdict(sp) {
 }
 
 window.ACT = {
-  shell: l => `<div id="actbox" data-act-id="${esc(String(l.id).replace('strava_', ''))}"><div class="tcard"><p class="small">Chargement des détails depuis Strava…</p></div></div>`,
+  shell: l => `<div id="actbox" data-act-id="${esc(l.src === 'file' ? l.id : String(l.id).replace('strava_', ''))}"><div class="tcard"><p class="small">Chargement des détails depuis Strava…</p></div></div>`,
   async fill() {
     const box = document.getElementById('actbox'); if (!box) return;
-    const id = box.dataset.actId, l = C().S().log.find(x => x.id === 'strava_' + id);
+    const id = box.dataset.actId, l = C().S().log.find(x => x.id === 'strava_' + id || x.id === id);
     try {
       const d = await load(id); if (!box.isConnected) return;
-      if (!d) { box.innerHTML = `<div class="tcard"><p class="small">${window.SYNC && window.SYNC.on() ? 'Détails indisponibles hors connexion. Reviens avec du réseau : ils seront ensuite gardés sur l\'appareil.' : 'Active la synchro et connecte Strava (Moi → Réglages) pour voir la carte, les temps intermédiaires et les zones.'}</p></div>`; return; }
+      if (!d) { box.innerHTML = `<div class="tcard"><p class="small">${window.SYNC && window.SYNC.on() ? (String(id).startsWith('imp_') ? 'Le détail de ce fichier n\'est pas encore arrivé sur cet appareil : synchronise, ou importe-le ici.' : 'Détails indisponibles hors connexion. Reviens avec du réseau : ils seront ensuite gardés sur l\'appareil.') : 'Active la synchro et connecte Strava (Moi → Réglages) pour voir la carte, les temps intermédiaires et les zones.'}</p></div>`; return; }
       box.innerHTML = render(l, d); bindCharts();
       if (window.__anaPrompt && d.splits && d.splits.length && !window.__anaPrompt.includes('Temps intermédiaires')) {
         const sp = d.splits.map((x, i) => (d.run ? 'km ' + (i + 1) + ' ' + mmss(x.sec / x.km) : fr(x.km, 0) + ' km à ' + fr(x.km / x.sec * 3600, 1) + ' km/h') + (x.hr ? ' (' + x.hr + ' bpm)' : '') + (x.elev ? ' ' + (x.elev > 0 ? '+' : '') + x.elev + ' m' : '')).join(', ');

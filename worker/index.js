@@ -410,7 +410,7 @@ export default {
     const admin = await env.KV.get('meta:admin');
     if (p === '/media' && req.method === 'GET') {
       const mine = await listMedia(env, me);
-      const shared = admin && admin !== me ? (await listMedia(env, admin)).filter(x => x.ex && x.ex !== 'body').map(x => ({ ...x, shared: true })) : [];
+      const shared = admin && admin !== me ? (await listMedia(env, admin)).filter(x => x.ex && x.ex !== 'body' && !String(x.ex).startsWith('act:')).map(x => ({ ...x, shared: true })) : [];
       return json(req, [...mine, ...shared]);
     }
     const m = p.match(/^\/media\/([A-Za-z0-9_-]{6,64})$/);
@@ -418,7 +418,7 @@ export default {
       const k = mKey(me, m[1]);
       if (req.method === 'GET') {
         let r = await env.KV.getWithMetadata(k, 'arrayBuffer');
-        if (!r.value && admin && admin !== me) { const r2 = await env.KV.getWithMetadata(mKey(admin, m[1]), 'arrayBuffer'); if (r2.value && r2.metadata && r2.metadata.ex !== 'body') r = r2; }
+        if (!r.value && admin && admin !== me) { const r2 = await env.KV.getWithMetadata(mKey(admin, m[1]), 'arrayBuffer'); if (r2.value && r2.metadata && r2.metadata.ex !== 'body' && !String(r2.metadata.ex).startsWith('act:')) r = r2; }
         if (!r.value) return json(req, { error: 'introuvable' }, 404);
         return new Response(r.value, { headers: { ...cors(req), 'Content-Type': (r.metadata && r.metadata.type) || 'application/octet-stream', 'Cache-Control': 'no-store' } });
       }

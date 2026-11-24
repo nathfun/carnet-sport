@@ -169,7 +169,8 @@ function html() {
     <div class="row" style="margin-top:8px"><button class="sm p" data-sync="adcreate">Créer le profil</button><button class="sm" data-sync="adreset">Réinitialiser son mot de passe</button></div>
     <div id="adlist" class="tiny" style="margin-top:8px"></div><button class="sm ghost" data-sync="adlist">Voir tous les profils</button></details>` : ''}
   <button class="ghost wide sm" style="margin-top:10px" data-sync="logout">Me déconnecter de cet appareil</button>
-  ${u.admin || cfg.strava ? `<div class="sec">Strava</div><p class="tiny" id="stravast">Vérification…</p><div id="stravabtn"></div>` : ''}`;
+  ${window.PROFILE && (window.PROFILE.has('run') || window.PROFILE.has('bike')) ? `<div class="sec">Strava</div><p class="tiny" id="stravast">Vérification…</p><div id="stravabtn"></div>
+  <p class="tiny" style="margin-top:6px">Pas de Strava ? Importe tes sorties en fichier (.gpx, .tcx ou .fit) depuis Garmin, ta montre ou Strava : <label class="link">Importer un fichier<input type="file" accept=".gpx,.tcx,.fit,application/gpx+xml" multiple hidden data-imp="1"></label></p>` : ''}`;
 }
 async function stravaBox() {
   const st = document.getElementById('stravast'), bx = document.getElementById('stravabtn'); if (!st || !on()) return;
@@ -177,7 +178,7 @@ async function stravaBox() {
     const s = await (await api('/strava/status')).json();
     if (!s.configured) { st.textContent = "Strava n'est pas encore branché sur ton serveur (clés à ajouter dans GitHub)."; bx.innerHTML = ''; return; }
     if (cfg.strava !== s.connected) { cfg.strava = s.connected; saveCfg(); }
-    st.textContent = s.connected ? `Connecté${s.name.trim() ? ' (' + s.name.trim() + ')' : ''}. Tes courses et sorties vélo arrivent toutes seules.` : 'Connecte ton compte : tes courses et sorties vélo arriveront toutes seules dans l\'app, même app fermée.';
+    st.textContent = s.connected ? `Connecté${s.name.trim() ? ' (' + s.name.trim() + ')' : ''}. Tes courses et sorties vélo arrivent toutes seules.` : 'Connecte ton compte Strava : tes courses et sorties vélo arriveront toutes seules dans l\'app, même app fermée. Si Strava refuse la connexion, demande à Nathan d\'ouvrir l\'accès.';
     bx.innerHTML = s.connected ? '<div class="row"><button class="sm" data-sync="spull">Récupérer maintenant</button><button class="sm ghost" data-sync="sunlink">Déconnecter</button></div>' : '<button class="wide" style="background:#fc4c02;color:#fff;border:0" data-sync="slink">Connecter Strava</button>';
   } catch (e) { st.textContent = 'Serveur injoignable pour le moment.'; }
 }
