@@ -241,10 +241,11 @@ function vAllures() {
 
 /* ================= vue Outils ================= */
 VIEWS.tools = () => {
-  const tabs = [['cm', 'Charge max'], ['cal', 'Calories'], ['al', 'Allures'], ['coach', 'Coach']];
-  const body = toolSub === 'cm' ? vCharge() : toolSub === 'cal' ? vCalories() : toolSub === 'al' ? vAllures() : C().coach();
-  const titles = { cm: 'Charge max', cal: 'Calories', al: 'Allures', coach: 'Coach' };
-  return `<div class="tool t-${toolSub}"><div class="kicker">Outils</div><h1>${titles[toolSub]}</h1><div class="seg tabs4" style="margin:14px 0">${tabs.map(([k, l]) => `<button class="${toolSub === k ? 'sel' : ''}" data-t="tsub" data-v="${k}">${l}</button>`).join('')}</div>${body}</div>`;
+  const tabs = [['cm', 'Charge max'], ['cal', 'Calories'], ['al', 'Allures'], ['chrono', 'Chronos'], ['nutri', 'Nutrition'], ['coach', 'Coach']];
+  const X = window.TOOLS2 || {};
+  const body = toolSub === 'cm' ? vCharge() : toolSub === 'cal' ? vCalories() : toolSub === 'al' ? vAllures() : toolSub === 'chrono' ? X.chrono() : toolSub === 'nutri' ? X.nutri() : C().coach();
+  const titles = { cm: 'Charge max', cal: 'Calories', al: 'Allures', chrono: 'Chronos', nutri: 'Nutrition', coach: 'Coach' };
+  return `<div class="tool t-${toolSub}"><div class="kicker">Outils</div><h1>${titles[toolSub]}</h1><div class="seg tabs4 scrollseg" style="margin:14px 0">${tabs.map(([k, l]) => `<button class="${toolSub === k ? 'sel' : ''}" data-t="tsub" data-v="${k}">${l}</button>`).join('')}</div>${body}</div>`;
 };
 AFTER.tools = runAnims;
 VIEWS.toolsGoto = k => { toolSub = k; };

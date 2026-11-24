@@ -264,6 +264,7 @@ function exosList() {
 function vExos() {
   const EQ = window.EQUIP || {}, MU = window.MUSCLES || [];
   return `<p class="mute small">${allEx().size} exercices. Touche-en un pour voir ton record, écrire un guide ou ajouter tes photos et vidéos.</p>
+  <div class="bodymap"><div class="bm-svg">${window.bodySvg(xM ? [xM] : [], { cls: 'bm' })}</div><div class="bm-t"><b>${xM ? esc(xM) : 'Choisis un muscle'}</b><small>${xM ? [...allEx().values()].filter(e => metaOf(e.id).m === xM).length + ' exercices' : 'Touche la silhouette, de face ou de dos'}</small>${xM ? '<button class="link" data-act="xm" data-v="' + esc(xM) + '">Tout afficher</button>' : ''}</div></div>
   <input id="xq" data-f="xq" value="${esc(xq)}" placeholder="Chercher un exercice" autocomplete="off" style="margin-top:10px">
   <div class="chips scrollx" style="margin-top:8px">${MU.map(m => `<button class="sm ${xM === m ? 'sel' : ''}" data-act="xm" data-v="${esc(m)}">${esc(m)}</button>`).join('')}</div>
   <div class="chips scrollx" style="margin-top:6px"><button class="sm ${xE === 'G' ? 'sel' : ''}" data-act="xe" data-v="G">Machines guidées</button>${['P', 'H', 'B', 'K', 'E', 'C'].map(k => `<button class="sm ${xE === k ? 'sel' : ''}" data-act="xe" data-v="${k}">${EQ[k]}</button>`).join('')}</div>
@@ -416,6 +417,8 @@ function ding() {
   try { if (!actx) return; const t = actx.currentTime; for (const [f, d, v] of [[1318.5, 0, .32], [1760, .16, .26]]) { const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(actx.destination); g.gain.setValueAtTime(0, t + d); g.gain.linearRampToValueAtTime(v, t + d + .01); g.gain.exponentialRampToValueAtTime(.0008, t + d + 1.1); o.start(t + d); o.stop(t + d + 1.2); } } catch (e) { }
   try { navigator.vibrate && navigator.vibrate([120, 80, 120]); } catch (e) { }
 }
+function blip() { try { if (!actx) return; const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = 880; o.connect(g); g.connect(actx.destination); g.gain.setValueAtTime(.18, t); g.gain.exponentialRampToValueAtTime(.001, t + .15); o.start(t); o.stop(t + .16); } catch (e) { } }
+let wl2 = null; async function wakeOn() { try { if ('wakeLock' in navigator && !wl2) { wl2 = await navigator.wakeLock.request('screen'); wl2.addEventListener('release', () => { wl2 = null; }); } } catch (e) { } }
 async function wake() { try { if (S.draft && 'wakeLock' in navigator && !wl) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } } catch (e) { } }
 function releaseWake() { try { wl && wl.release(); } catch (e) { } wl = null; }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { wake(); tick(); } });
@@ -478,6 +481,7 @@ function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('s
 
 /* ---------- événements ---------- */
 const confirmTap = (b, label) => { if (b.dataset.sure) return true; b.dataset.sure = '1'; const o = b.textContent; b.textContent = label; setTimeout(() => { if (b.isConnected) { b.textContent = o; delete b.dataset.sure; } }, 3500); return false; };
+document.addEventListener('click', ev => { const m = ev.target.closest('.bodymap [data-muscle]'); if (!m) return; xM = xM === m.dataset.muscle ? '' : m.dataset.muscle; render(); }, true);
 document.addEventListener('click', async ev => {
   if (ev.target.closest('[data-close]')) { closeSheet(); return; }
   const lvStop = ev.target.closest('#lvStop');
@@ -598,7 +602,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloaded) return; reloaded = true; if (!S.draft) location.reload(); else toast("Nouvelle version prête : elle s'appliquera à la prochaine ouverture"); });
 }
 
-window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid) };
+window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid), ding, blip, unlockAudio, wakeOn };
 window.CARNET_fillMedia = fillMedia;
 if (!['home', 'workout', 'program', 'progress', 'tools', 'me'].includes(view)) view = 'home';
 window.applyTheme && window.applyTheme();
