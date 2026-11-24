@@ -33,9 +33,9 @@ function card(a, o = {}) {
 /* ---------- vues ---------- */
 VIEWS.social = () => {
   if (!SY().on()) return `<div class="kicker">Amis</div><h1>Amis</h1><div class="tcard"><p>Pour retrouver tes amis, il faut un compte.</p><button class="p wide" data-sync="login">Me connecter ou créer un compte</button></div>`;
-  if (profU) return `<button class="link" data-so="back">← Amis</button><div id="socbox">${profileHtml()}</div>`;
+  if (profU) return `<button class="link" data-so="back">← Retour</button><div id="socbox">${profileHtml()}</div>`;
   const n = (data.me && data.me.in || []).length;
-  return `<div class="kicker">Mon espace</div><h1>Amis</h1>
+  return `<button class="link" data-act="goto" data-v="me">← Moi</button><div class="kicker">Mon espace</div><h1>Amis</h1>
   <div class="seg" style="margin:12px 0">${[['feed', 'Fil'], ['friends', 'Amis' + (n ? ` <i class="sbadge">${n}</i>` : '')], ['me', 'Mon profil public']].map(([k, l]) => `<button class="${sub === k ? 'sel' : ''}" data-so="sub" data-v="${k}">${l}</button>`).join('')}</div>
   <div id="socbox">${{ feed: feedHtml, friends: friendsHtml, me: privHtml }[sub]()}</div>`;
 };
@@ -88,6 +88,7 @@ async function load() {
   try {
     if (!navigator.onLine) throw new Error('Pas de réseau : le fil s\'affichera dès que tu seras connecté.');
     if (profU) data.prof = await get('/social/profile/' + encodeURIComponent(profU));
+    if (data.me) { meCache = data.me; try { localStorage.setItem('carnet-socme', JSON.stringify(meCache)); } catch (_) { } }
     else { data.me = await get('/social/me'); if (data.me.friends.length && !C().S().set.hasFriends) { C().S().set.hasFriends = true; C().save(); } if (sub === 'feed') { data.feed = await get('/social/feed'); try { localStorage.setItem('carnet-feed', JSON.stringify(data.feed.slice(0, 6))); } catch (_) { } } }
   } catch (e) { err = e.message; }
   loading = false;
@@ -137,8 +138,28 @@ document.addEventListener('change', async e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'cmtin') document.querySelector('[data-so=send]')?.click(); });
 
+/* ---------- page Moi : profil public ---------- */
+let meCache = null; try { meCache = JSON.parse(localStorage.getItem('carnet-socme') || 'null'); } catch (_) { }
+function profileCard() {
+  if (!SY().on()) return `<section class="mepro"><div class="mp-top">${av('?', '?', true)}<div><h1>Moi</h1><small>Sans compte : tout reste sur cet appareil.</small></div></div><button class="p wide" data-sync="login">Créer un compte ou me connecter</button></section>`;
+  const u = SY().cfg().user || {}, m = meCache || {}, P = m.privacy || { vis: 'friends', bio: '' }, S = C().S(), now = new Date();
+  const mo = S.log.filter(l => { const d = new Date(l.start); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && !l.hide; }).length;
+  const prs = S.log.reduce((a, l) => a + (l.prs || []).length, 0), nIn = (m.in || []).length;
+  return `<section class="mepro"><div class="mp-top">${av(u.u, u.name, true)}<div class="grow"><h1>${esc(u.name || u.u)}</h1><small>@${esc(u.u)} · ${P.vis === 'public' ? '🌍 Profil public' : P.vis === 'private' ? '🔒 Profil privé' : '👥 Visible par mes amis'}</small></div></div>
+    <p class="mp-bio ${P.bio ? '' : 'mute'}">${P.bio ? esc(P.bio) : 'Pas encore de bio.'}</p>
+    <div class="mp-stats"><button data-so="sub" data-v="friends"><b>${(m.friends || []).length}</b><small>ami${(m.friends || []).length > 1 ? 's' : ''}</small></button><div><b>${mo}</b><small>activités ce mois</small></div><div><b>${prs}</b><small>records</small></div></div>
+    ${nIn ? `<button class="mp-req" data-so="sub" data-v="friends">👋 ${nIn} demande${nIn > 1 ? 's' : ''} d'ami en attente ›</button>` : ''}
+    <div class="row"><button class="p sm grow" data-so="sub" data-v="me">Modifier mon profil public</button><button class="sm grow" data-so="sub" data-v="friends">Mes amis</button><button class="sm grow" data-sync="invite">Inviter</button></div>
+    <button class="link" style="margin-top:8px" data-so="prof" data-u="${esc(u.u)}">Voir mon profil comme mes amis le voient ›</button></section>`;
+}
+async function refreshMe() {
+  if (!SY().on() || !navigator.onLine) return;
+  try { meCache = await get('/social/me'); localStorage.setItem('carnet-socme', JSON.stringify(meCache)); if (meCache.friends.length && !C().S().set.hasFriends) { C().S().set.hasFriends = true; C().save(); } const el = document.querySelector('.mepro'); if (el) el.outerHTML = profileCard(); } catch (_) { }
+}
+
 /* ---------- accueil : dernières activités des amis ---------- */
 window.SOCIAL = {
+  profileCard, refreshMe,
   homeCard() {
     if (!SY().on()) return '';
     let F = []; try { F = JSON.parse(localStorage.getItem('carnet-feed') || '[]'); } catch (_) { }

@@ -10,6 +10,7 @@ let cfg = {}; try { cfg = JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } cat
 const saveCfg = () => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) { } };
 const base = () => (cfg.url || SERVER).replace(/\/+$/, '');
 const on = () => !!cfg.token;
+const failed = new Set();
 let snap = null, lastIds = null, dirty = false, busy = false, timer = null, status = '', applying = false;
 
 /* ---------- suivi des modifications (appelé à chaque enregistrement) ---------- */
@@ -77,17 +78,17 @@ const canon = o => JSON.stringify(sortD(o));
 const payload = S => { const d = {}; for (const k of Object.keys(S)) if (!['inbox', 'seen'].includes(k)) d[k] = S[k]; return d; };
 
 /* ---------- photos et GIF ---------- */
-const allLocal = () => new Promise(res => C().media.ready().then(() => C().media.tx(st => { const q = st.getAll(); q.onsuccess = () => res(q.result || []); })));
+const allLocal = () => new Promise(res => C().media.ready().then(() => C().media.tx(st => { const q = st.getAll(); q.onsuccess = () => res(q.result || []); }, true)));
 async function syncMedia(S) {
   let local = await allLocal();
   const noUid = local.filter(m => !m.uid);
-  if (noUid.length) { await C().media.tx(st => { for (const m of noUid) { m.uid = uid(); st.put(m); } }); }
+  if (noUid.length) { await C().media.tx(st => { for (const m of noUid) { m.uid = uid(); st.put(m); } }, true); }
   const del = new Set(S._mdel || []);
   const remote = await (await api('/media')).json(), rset = new Set(remote.map(r => r.uid)), lset = new Set(local.map(m => m.uid));
   let up = 0, down = 0, skipped = 0;
   // suppressions (dont les GIF partagés que Nathan a retirés)
   const goneLocal = local.filter(m => del.has(m.uid) || (m.shared && !rset.has(m.uid)));
-  if (goneLocal.length) await C().media.tx(st => { for (const m of goneLocal) st.raw.delete(m.k); });
+  if (goneLocal.length) await C().media.tx(st => { for (const m of goneLocal) st.raw.delete(m.k); }, true);
   for (const r of remote) if (del.has(r.uid) && !r.shared) await api('/media/' + r.uid, { method: 'DELETE' });
   // envois
   for (const m of local) {
@@ -99,10 +100,15 @@ async function syncMedia(S) {
   // réceptions
   for (const r of remote) {
     if (del.has(r.uid) || lset.has(r.uid)) continue;
-    const res = await api('/media/' + r.uid); if (!res.ok) continue;
-    const blob = await res.blob();
-    await C().media.tx(st => st.raw.add({ uid: r.uid, ex: r.ex, type: r.type || blob.type, t: r.t, blob, ...(r.shared ? { shared: true } : {}) }));
-    down++;
+    if (failed.has(r.uid)) continue;
+    try {
+      const res = await api('/media/' + r.uid); if (!res.ok) continue;
+      // Safari refuse parfois d'enregistrer un fichier venu du réseau : on le recopie en mémoire d'abord
+      const buf = await res.arrayBuffer(), blob = new Blob([buf], { type: r.type || res.headers.get('Content-Type') || 'application/octet-stream' });
+      const okk = await C().media.tx(st => st.raw.add({ uid: r.uid, ex: r.ex, type: blob.type, t: r.t, blob, ...(r.shared ? { shared: true } : {}) }), true);
+      if (okk === false) { failed.add(r.uid); continue; }
+      down++;
+    } catch (_) { failed.add(r.uid); }
   }
   return { up, down, skipped };
 }

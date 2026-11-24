@@ -72,7 +72,8 @@ function vApparence() {
 VIEWS.me = () => {
   const tabs = [['corps', 'Mon corps'], ['apparence', 'Apparence'], ['reglages', 'Réglages']];
   const body = meSub === 'corps' ? vCorps() : meSub === 'apparence' ? vApparence() : C().settingsHtml();
-  return `<div class="kicker">Mon espace</div><h1>${{ corps: 'Mon corps', apparence: 'Apparence', reglages: 'Réglages' }[meSub]}</h1><div class="seg" style="margin:14px 0">${tabs.map(([k, l]) => `<button class="${meSub === k ? 'sel' : ''}" data-m="sub" data-v="${k}">${l}</button>`).join('')}</div>${body}`;
+  setTimeout(() => window.SOCIAL && window.SOCIAL.refreshMe(), 0);
+  return `${window.SOCIAL ? window.SOCIAL.profileCard() : ''}<div class="mepriv"><span>🔒</span><div><b>Privé</b><small>Visible seulement par toi</small></div></div><div class="seg" style="margin:10px 0 14px">${tabs.map(([k, l]) => `<button class="${meSub === k ? 'sel' : ''}" data-m="sub" data-v="${k}">${l}</button>`).join('')}</div>${body}`;
 };
 VIEWS.meGoto = k => { meSub = k; };
 

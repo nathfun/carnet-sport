@@ -68,7 +68,7 @@ const mediaFor = ex => new Promise(res => { if (!idb) return res([]); try { cons
 const mediaWrap = st => ({ raw: st, get: k => st.get(k), getAll: (...x) => st.getAll(...x), index: n => st.index(n), put: r => st.put(r),
   add: r => { if (!r.uid && window.SYNC) r.uid = window.SYNC.uid(); return st.add(r); },
   delete: k => { const g = st.get(k); g.onsuccess = () => { if (g.result && g.result.uid && window.SYNC) window.SYNC.tomb(g.result.uid); st.delete(k); }; } });
-const mediaTx = (fn) => new Promise(res => { if (!idb) return res(); const t = idb.transaction('media', 'readwrite'); fn(mediaWrap(t.objectStore('media'))); t.oncomplete = res; t.onerror = () => { toast("Impossible d'enregistrer ce fichier"); res(); }; });
+const mediaTx = (fn, quiet) => new Promise(res => { if (!idb) return res(false); let t; try { t = idb.transaction('media', 'readwrite'); fn(mediaWrap(t.objectStore('media'))); } catch (e) { if (!quiet) toast("Impossible d'enregistrer ce fichier"); return res(false); } t.oncomplete = () => res(true); t.onerror = e => { e.preventDefault && e.preventDefault(); if (!quiet) toast("Impossible d'enregistrer ce fichier"); res(false); }; t.onabort = () => res(false); });
 const objUrls = [];
 async function fillMedia(exId) {
   await idbReady; const boxes = document.querySelectorAll(`[data-media="${CSS.escape(exId)}"]`); if (!boxes.length) return;
@@ -557,7 +557,7 @@ function settingsInner() {
   <div class="pills">${[6, 7, 8].map(n => `<button class="${(window.DELOAD ? window.DELOAD.cfg().every : 7) === n ? 'sel' : ''}" data-ex="deloadevery" data-v="${n}">${n} semaines</button>`).join('')}</div>
   ${window.SYNC ? window.SYNC.html() : ''}
   <div class="sec">Aide</div><button class="wide" data-act="goto" data-v="guide">📖 Revoir le guide de l'app</button>
-  <div class="sec">Version</div><p class="tiny">Version 28 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
+  <div class="sec">Version</div><p class="tiny">Version 29 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
   <div class="sec">Sauvegarde</div>
   <p class="tiny">Copie de secours manuelle, utile si la synchro n'est pas activée. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
