@@ -116,7 +116,7 @@ const app = $('#app');
 function go(v) { view = v; render(); window.scrollTo(0, 0); }
 function render() {
   for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('sel', b.dataset.view === view);
-  app.innerHTML = ({ home: vHome, workout: vWorkout, program: vProgram, progress: vProgress, coach: vCoach }[view] || vHome)();
+  app.innerHTML = ({ home: vHome, workout: vWorkout, program: vProgram, exos: vExos, progress: vProgress, coach: vCoach }[view] || vHome)();
   if (view === 'workout' && S.draft) { const c = S.draft.ex[S.draft.cur]; if (c) fillMedia(c.id); }
   if (view === 'progress') drawChart();
   tick();
@@ -251,6 +251,35 @@ function drawChart() {
   note.textContent = `${lbl} à chaque séance : ${pts[0].v} kg au début, ${pts.at(-1).v} kg la dernière fois (${d >= 0 ? '+' : ''}${d.toFixed(1)} kg).`;
 }
 new ResizeObserver(() => view === 'progress' && drawChart()).observe(document.body);
+
+/* bibliothèque */
+let xq = '', xM = '', xE = '';
+function exosList() {
+  const q = xq.toLowerCase();
+  const list = [...allEx().values()].filter(e => { const m = metaOf(e.id); return e.n.toLowerCase().includes(q) && (!xM || m.m === xM) && (!xE || (xE === 'G' ? m.eq === 'M' || m.eq === 'S' : m.eq === xE)); }).sort((a, b) => a.n.localeCompare(b.n, 'fr'));
+  return list.length ? list.map(e => { const m = metaOf(e.id), R = REC.get(e.id); return `<button class="xrow" data-act="exinfo" data-id="${esc(e.id)}"><div><b>${esc(e.n)}</b><div class="tiny">${esc([m.m, (window.EQUIP || {})[m.eq]].filter(Boolean).join(' · ') || 'Perso')}${S.guides[e.id] ? ' · guide' : ''}</div></div>${R ? `<span class="pill">${R.kg} kg</span>` : ''}</button>`; }).join('') : '<p class="tiny">Aucun exercice ne correspond. Tu peux en créer un depuis une séance ou le programme.</p>';
+}
+function vExos() {
+  const EQ = window.EQUIP || {}, MU = window.MUSCLES || [];
+  return `<h1>Exercices</h1><p class="mute small">${allEx().size} exercices. Touche-en un pour voir ton record, écrire un guide ou ajouter tes photos et vidéos.</p>
+  <input id="xq" data-f="xq" value="${esc(xq)}" placeholder="Chercher un exercice" autocomplete="off" style="margin-top:10px">
+  <div class="chips scrollx" style="margin-top:8px">${MU.map(m => `<button class="sm ${xM === m ? 'sel' : ''}" data-act="xm" data-v="${esc(m)}">${esc(m)}</button>`).join('')}</div>
+  <div class="chips scrollx" style="margin-top:6px"><button class="sm ${xE === 'G' ? 'sel' : ''}" data-act="xe" data-v="G">Machines guidées</button>${['P', 'H', 'B', 'C'].map(k => `<button class="sm ${xE === k ? 'sel' : ''}" data-act="xe" data-v="${k}">${EQ[k]}</button>`).join('')}</div>
+  <div class="card" id="xlist" style="padding:4px 12px">${exosList()}</div>`;
+}
+function exInfo(id) {
+  const e = allEx().get(id); if (!e) return; const m = metaOf(id), R = REC.get(id), l = lastSets(id), D = S.draft;
+  sheet(`<h2>${esc(e.n)}</h2><p class="tiny">${esc([m.m, (window.EQUIP || {})[m.eq]].filter(Boolean).join(' · '))} · ${e.sets} × ${esc(e.reps)} · repos ${restLabel(+e.rest)}</p>
+    <div class="stats" style="margin-top:10px"><div class="stat"><div class="tiny">Record</div><div class="num">${R ? R.kg + ' kg' : '—'}</div></div><div class="stat"><div class="tiny">1RM estimé</div><div class="num">${R ? R.e1 + ' kg' : '—'}</div></div><div class="stat"><div class="tiny">Dernière fois</div><div class="small"><b>${l ? esc(setsTxt(l)) : '—'}</b></div></div></div>
+    <label style="margin-top:12px">Guide / consignes<textarea rows="3" data-guide="${esc(id)}" placeholder="Ex. siège cran 4, dos collé, pousser sans verrouiller les coudes">${esc(S.guides[id] || '')}</textarea></label>
+    <div class="media" data-media="${esc(id)}"></div>
+    <div class="row"><label class="btn sm">Ajouter photo, GIF ou vidéo<input type="file" accept="image/*,video/*" multiple hidden data-add="${esc(id)}"></label><a class="btn sm" href="${yt(e.q || e.n)}" target="_blank" rel="noopener">Vidéos YouTube</a></div>
+    <div class="sec">Ajouter cet exercice</div>
+    ${D ? `<button class="p wide" data-act="pickex" data-id="${esc(id)}" data-target="draft" data-si="">À la séance en cours</button>` : ''}
+    <div class="row" style="margin-top:8px"><select id="xsess" class="grow" aria-label="Séance du programme">${S.program.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('')}</select><button data-act="toprog" data-id="${esc(id)}">Au programme</button></div>
+    <button class="ghost wide" style="margin-top:10px" data-close>Fermer</button>`);
+  fillMedia(id);
+}
 
 /* coach */
 const QUICK = ['Quelles charges je dois augmenter à ma prochaine séance ?', "Je stagne au développé couché, qu'est-ce que je change ?", 'Fais-moi le bilan de mes 2 dernières semaines.', 'Que manger avant et après la salle pour être sec ?'];
@@ -415,6 +444,10 @@ document.addEventListener('click', async ev => {
       save(); render(); break; }
     case 'stype': { const s = cur.sets[+b.dataset.j], o = ['', 'e', 'd', 'f']; s.t = o[(o.indexOf(s.t || '') + 1) % 4]; save(); render(); break; }
     case 'superset': { const n = D.ex[D.cur + 1]; if (!n) break; if (cur.ss && n.ss === cur.ss) { const g = cur.ss; for (const x of D.ex) if (x.ss === g) delete x.ss; } else { const g = cur.ss || uid(); cur.ss = g; n.ss = g; } save(); render(); break; }
+    case 'xm': xM = xM === b.dataset.v ? '' : b.dataset.v; render(); break;
+    case 'xe': xE = xE === b.dataset.v ? '' : b.dataset.v; render(); break;
+    case 'exinfo': exInfo(b.dataset.id); break;
+    case 'toprog': { const e = allEx().get(b.dataset.id), si = +$('#xsess').value, p = S.program[si]; if (p.ex.some(x => x.id === e.id)) { toast('Déjà dans ' + p.name); break; } const { m, eq, ...r } = e; p.ex.push({ ...r }); save(); toast('Ajouté à ' + p.name); break; }
     case 'ptab': progTab = b.dataset.t; render(); break;
     case 'metric': metric = b.dataset.m; render(); break;
     case 'fm': fM = fM === b.dataset.v ? '' : b.dataset.v; listEx(); break;
@@ -449,6 +482,7 @@ document.addEventListener('input', ev => {
   if (t.dataset.f === 'kg' || t.dataset.f === 'r') { const c = D.ex[D.cur]; c.sets[+t.dataset.j][t.dataset.f] = t.value; save(); }
   else if (t.dataset.f === 'note' && D) { D.note = t.value; save(); }
   else if (t.dataset.guide) { const v = t.value; if (v.trim()) S.guides[t.dataset.guide] = v; else delete S.guides[t.dataset.guide]; save(); }
+  else if (t.dataset.f === 'xq') { xq = t.value; $('#xlist').innerHTML = exosList(); }
   else if (t.dataset.f === 'coachq') { S.coachQ = t.value; save(); }
   else if (t.dataset.pf) { const s = S.program[+t.dataset.si]; if (t.dataset.ei === undefined) s[t.dataset.pf] = t.value; else { const e = s.ex[+t.dataset.ei], f = t.dataset.pf; e[f] = f === 'sets' || f === 'rest' ? (parseInt(t.value) || 0) : t.value; if (f === 'n') e.q = t.value + ' technique'; } save(); }
 });
