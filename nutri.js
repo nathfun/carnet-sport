@@ -4,6 +4,7 @@
 {
 const C = () => window.CARNET;
 const T2 = window.TOOLS2 = window.TOOLS2 || {};
+window.NUTRI_GO = m => { mode = m; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fr = (v, d = 0) => Number(v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
 const fn = v => fr(v, v < 10 && v % 1 ? 1 : 0);
@@ -99,7 +100,7 @@ const EMO = { 'Œufs et laitiers': '🥛', Viandes: '🍗', Charcuterie: '🥓',
 const NUT = [['p', 'Protéines', 'g', 0, 'g'], ['fi', 'Fibres', 'g', 30, 'g'], ['ca', 'Calcium', 'mg', 950, 'g'], ['fe', 'Fer', 'mg', 11, 'g'], ['mg', 'Magnésium', 'mg', 420, 'g'], ['k', 'Potassium', 'mg', 3500, 'g'], ['vc', 'Vitamine C', 'mg', 110, 'g'], ['vd', 'Vitamine D', 'µg', 15, 'g'], ['b12', 'Vitamine B12', 'µg', 4, 'g'], ['ags', 'Graisses saturées', 'g', 22, 'w'], ['su', 'Sucres', 'g', 100, 'w'], ['sel', 'Sel', 'g', 6, 'w']];
 const foods = () => [...BASE, ...((C().S().foods || []).map(f => ({ ...f, cat: 'Mes aliments' })))];
 const ref = () => { const s = window.calSummary ? window.calSummary() : { kcal: 2500, p: 120 }; return { kcal: s.kcal || 2500, p: s.p || 120 }; };
-let q = '', cat = '', open = null, qty = 'portion', grams = 100, cmpA = null, cmpB = null, mode = 'zoom';
+let q = '', cat = '', open = null, qty = 'portion', grams = 100, cmpA = null, cmpB = null, mode = 'jour';
 const amount = f => qty === 'portion' ? f.pg : qty === '100' ? 100 : grams;
 function per(f, g) { const o = {}; for (const k of K) o[k] = (f[k] || 0) * g / 100; return o; }
 function pct(n, v) { const r = ref(); const d = n[0] === 'p' ? r.p : n[3]; return d ? v / d * 100 : 0; }
@@ -142,12 +143,69 @@ function addSheet() {
     <div class="nform">${F.map(([k, l, t]) => `<label class="lbl">${l}<input id="nf_${k}" ${t === 'n' ? 'inputmode="decimal"' : ''}></label>`).join('')}</div>
     <button class="p wide" style="margin-top:14px" data-nu="savefood">Enregistrer</button><button class="ghost wide" style="margin-top:8px" data-close>Fermer</button>`);
 }
-T2.nutri = () => `<div class="seg" style="margin-bottom:12px">${[['zoom', 'Zoom aliment'], ['cmp', 'Comparer']].map(([k, l]) => `<button class="${mode === k ? 'sel' : ''}" data-nu="mode" data-v="${k}">${l}</button>`).join('')}</div>` + (mode === 'cmp' ? compare() : open ? (foods().find(f => f.id === open) ? card(foods().find(f => f.id === open)) : list()) : list());
+
+/* ---------- Mon jour + idées repas ---------- */
+const IDEAS = [
+  ['Bol poulet, riz, brocoli', 'midi', [['Blanc de poulet cuit', 150], ['Riz blanc cuit', 200], ['Brocoli cuit', 150], ["Huile d'olive", 10]]],
+  ['Saumon, patate douce, épinards', 'soir', [['Saumon cuit', 130], ['Patate douce cuite', 220], ['Épinards cuits', 150]]],
+  ['Pâtes complètes bolognaise maison', 'midi', [['Pâtes complètes cuites', 220], ['Steak haché 5 % cuit', 125], ['Tomate', 120], ['Emmental', 15]]],
+  ['Cabillaud, lentilles, carottes', 'soir', [['Cabillaud cuit', 160], ['Lentilles cuites', 200], ['Carotte crue', 100], ['Huile de colza', 10]]],
+  ['Dinde, quinoa, haricots verts', 'soir', [['Escalope de dinde cuite', 140], ['Quinoa cuit', 180], ['Haricots verts cuits', 150], ["Huile d'olive", 10]]],
+  ['Omelette 3 œufs et pain complet', 'matin', [['Œuf entier cuit', 150], ['Pain complet', 60], ['Comté', 20], ['Salade verte', 50]]],
+  ['Porridge protéiné', 'matin', [["Flocons d'avoine", 60], ['Lait demi-écrémé', 250], ['Whey protéine', 20], ['Banane', 120]]],
+  ['Skyr bowl après la séance', 'collation', [['Skyr nature', 150], ["Flocons d'avoine", 40], ['Banane', 120], ['Myrtilles', 50]]],
+  ['Shake de récup', 'collation', [['Whey protéine', 30], ['Lait demi-écrémé', 300], ['Banane', 120]]],
+  ['Fromage blanc, amandes, miel', 'collation', [['Fromage blanc 0 %', 200], ['Amandes', 20], ['Miel', 10]]],
+  ['Tofu sauté, riz complet, champignons', 'soir', [['Tofu nature', 150], ['Riz complet cuit', 180], ['Champignons de Paris', 120], ['Huile de colza', 10]]],
+  ['Thon, pommes de terre, tomates', 'midi', [['Thon au naturel', 120], ['Pomme de terre cuite', 250], ['Tomate', 150], ["Huile d'olive", 10]]]
+];
+const byName = n => BASE.find(f => f.n === n);
+function idea(i) { const [n, when, items] = IDEAS[i]; const it = items.map(([fn2, g]) => ({ f: byName(fn2), g })).filter(x => x.f); const t = { kcal: 0, p: 0, g: 0, l: 0 }; for (const x of it) for (const k in t) t[k] += x.f[k] * x.g / 100; return { i, n, when, it, ...t }; }
+const day = t => { const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+let dayT = Date.now();
+function targets() { const r = ref(), w = C().body().w, f = Math.round(.8 * w); return { kcal: r.kcal, p: r.p, l: f, g: Math.max(0, Math.round((r.kcal - r.p * 4 - f * 9) / 4)) }; }
+function eaten(t) { const S = C().S(), L = (S.eat || {})[day(t)] || [], all = foods(), tot = { kcal: 0, p: 0, g: 0, l: 0 }; const rows = L.map((e, i) => { const f = all.find(x => x.id === e.fid); if (!f) return null; const v = per(f, e.g); for (const k in tot) tot[k] += v[k]; return { i, f, g: e.g, v, m: e.m }; }).filter(Boolean); return { rows, tot }; }
+function gauge(lbl, v, max, unit, col) { const p = Math.min(100, v / max * 100), over = v > max * 1.08; return `<div class="dg"><div class="between"><b>${lbl}</b><span><b class="num">${fr(v)}</b> / ${fr(max)} ${unit}</span></div><div class="dg-bar ${over ? 'over' : ''}"><i style="width:${p}%;background:${col}"></i></div></div>`; }
+function vJour() {
+  const T = targets(), { rows, tot } = eaten(dayT), isToday = day(dayT) === day(Date.now()), left = T.p - tot.p;
+  const sug = window.NUTRI.suggest(tot);
+  return `<div class="wnav"><button class="sm" data-nu="dprev" aria-label="Jour précédent">‹</button><b>${isToday ? "Aujourd'hui" : new Date(dayT).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })}</b><button class="sm" data-nu="dnext" aria-label="Jour suivant" ${isToday ? 'disabled' : ''}>›</button></div>
+  <div class="tcard daycard"><div class="dring">${ring(tot.kcal, T.kcal)}</div><div class="dgs">${gauge('Protéines', tot.p, T.p, 'g', '#2f6bff')}${gauge('Glucides', tot.g, T.g, 'g', '#10b981')}${gauge('Lipides', tot.l, T.l, 'g', '#f5b400')}</div></div>
+  ${isToday && left > 15 ? `<p class="tiny">Il te manque <b>${fr(left)} g de protéines</b> aujourd'hui.${sug ? ` Idée : <b>${esc(sug.n)}</b> (${fr(sug.p)} g).` : ''}</p>` : isToday && rows.length ? '<p class="tiny">Objectif protéines atteint, bien joué 💪</p>' : ''}
+  <div class="row" style="margin:8px 0"><button class="p grow" data-nu="addeat">+ Ajouter un aliment</button><button class="grow" data-nu="mode" data-v="idees">Idées repas</button></div>
+  <div class="tcard" style="padding:4px 12px">${rows.map(r => `<div class="frow"><span class="fe">${EMO[r.f.cat] || '🍽️'}</span><span class="ft"><b>${esc(r.f.n)}</b><small>${r.g} g · ${fr(r.v.kcal)} kcal · ${fn(r.v.p)} g prot.</small></span><button class="gdel" data-nu="deleat" data-v="${r.i}" aria-label="Retirer">✕</button></div>`).join('') || '<p class="tiny">Rien de noté pour ce jour. Ajoute ce que tu manges, ou une idée repas en un geste.</p>'}</div>`;
+}
+function ring(v, max) { const r = 52, c = 2 * Math.PI * r, p = Math.min(1, v / max); return `<svg viewBox="0 0 120 120" class="kring"><circle cx="60" cy="60" r="${r}" class="kr-bg"/><circle cx="60" cy="60" r="${r}" class="kr-p" style="stroke-dasharray:${c};stroke-dashoffset:${c * (1 - p)}"/></svg><div class="kr-c"><b>${fr(v)}</b><small>/ ${fr(max)} kcal</small></div>`; }
+function vIdees() {
+  const L = IDEAS.map((_, i) => idea(i)), W = { matin: 'Petit-déjeuner', midi: 'Déjeuner', soir: 'Dîner', collation: 'Collation' };
+  return `<p class="lede">Des repas simples et riches en protéines, calculés avec ta liste d'aliments. Touche « J'ai mangé ça » pour les noter dans ta journée.</p>
+  ${Object.entries(W).map(([k, l]) => `<div class="eyebrow" style="margin-top:14px">${l}</div>${L.filter(x => x.when === k).map(x => `<div class="tcard idea"><div class="between"><b>${esc(x.n)}</b><span class="okchip">${fr(x.p)} g prot.</span></div><p class="tiny">${x.it.map(y => esc(y.f.n.toLowerCase()) + ' ' + y.g + ' g').join(' · ')}</p><div class="between"><span class="small"><b>${fr(x.kcal)}</b> kcal · ${fr(x.g)} g gluc. · ${fr(x.l)} g lip.</span><button class="sm" data-nu="ate" data-v="${x.i}">J'ai mangé ça</button></div></div>`).join('')}`).join('')}`;
+}
+function eatSheet() {
+  C().sheet(`<h2>Ajouter un aliment</h2><input id="eq" placeholder="Chercher : skyr, poulet, riz…" autocomplete="off" style="margin-top:8px"><div id="elist" style="max-height:38vh;overflow:auto;margin-top:6px"></div><button class="ghost wide" style="margin-top:8px" data-close>Fermer</button>`);
+  const draw = () => { const qq = (document.getElementById('eq').value || '').toLowerCase(); document.getElementById('elist').innerHTML = foods().filter(f => f.n.toLowerCase().includes(qq)).slice(0, 40).map(f => `<div class="frow"><span class="fe">${EMO[f.cat] || ''}</span><span class="ft"><b>${esc(f.n)}</b><small>${esc(f.pl)} (${f.pg} g)</small></span><span class="row" style="gap:4px"><input class="eg" inputmode="numeric" value="${f.pg}" data-egf="${f.id}" aria-label="Grammes" style="width:64px;min-height:38px;padding:4px 6px;text-align:center"><button class="sm p" data-nu="eatadd" data-v="${f.id}">+</button></span></div>`).join(''); };
+  document.getElementById('eq').addEventListener('input', draw); draw();
+}
+function addEat(fid, g) { const S = C().S(), k = day(dayT); S.eat = S.eat || {}; (S.eat[k] = S.eat[k] || []).push({ fid, g, t: Date.now() }); C().save(); }
+window.NUTRI = {
+  suggest(tot) { const h = new Date().getHours(), when = h < 10 ? 'matin' : h < 14 ? 'midi' : h < 18 ? 'collation' : 'soir'; const L = IDEAS.map((_, i) => idea(i)).filter(x => x.when === when).sort((a, b) => b.p - a.p); return L[Math.floor((new Date().getDate()) % Math.max(1, L.length))] || null; },
+  afterWorkout() { const s = this.suggest(); return s ? { n: s.n, p: Math.round(s.p), kcal: Math.round(s.kcal), items: s.it.map(y => y.f.n.toLowerCase() + ' ' + y.g + ' g').join(' · '), i: s.i } : null; },
+  ate(i) { for (const y of idea(i).it) addEat(y.f.id, y.g); },
+  today() { const { tot } = eaten(Date.now()), T = targets(); return { kcal: Math.round(tot.kcal), p: Math.round(tot.p), tk: T.kcal, tp: T.p }; }
+};
+
+T2.nutri = () => `<div class="seg" style="margin-bottom:12px">${[['jour', 'Mon jour'], ['idees', 'Idées repas'], ['zoom', 'Zoom'], ['cmp', 'Comparer']].map(([k, l]) => `<button class="${mode === k ? 'sel' : ''}" data-nu="mode" data-v="${k}">${l}</button>`).join('')}</div>` + (mode === 'jour' ? vJour() : mode === 'idees' ? vIdees() : mode === 'cmp' ? compare() : open ? (foods().find(f => f.id === open) ? card(foods().find(f => f.id === open)) : list()) : list());
 
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-nu]'); if (!b || !window.CARNET) return; const v = b.dataset.v, S = C().S();
   switch (b.dataset.nu) {
     case 'mode': mode = v; break;
+    case 'dprev': dayT -= 864e5; break;
+    case 'dnext': dayT = Math.min(Date.now(), dayT + 864e5); break;
+    case 'addeat': eatSheet(); return;
+    case 'eatadd': { const inp = document.querySelector(`[data-egf="${v}"]`), g = Math.max(1, parseInt(inp && inp.value) || 100); addEat(v, g); C().toast('Ajouté'); C().closeSheet(); break; }
+    case 'deleat': { const k = day(dayT); (S.eat[k] || []).splice(+v, 1); C().save(); break; }
+    case 'ate': window.NUTRI.ate(+v); mode = 'jour'; C().toast('Repas noté dans ta journée'); break;
     case 'cat': cat = cat === v ? '' : v; break;
     case 'open': open = v; qty = 'portion'; window.scrollTo(0, 0); break;
     case 'close': open = null; break;

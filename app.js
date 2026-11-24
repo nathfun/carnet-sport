@@ -119,7 +119,8 @@ function vHome() {
   const weeks = Array.from({ length: 8 }, (_, i) => { const k = now - (7 - i) * W; return `<i class="${(m.get(k) || 0) >= S.set.goal ? 'on' : ''} ${k === now ? 'now' : ''}" title="${dateFr(k)}"></i>`; }).join('');
   const run = RUNS[isoWeek(Date.now()) % 3], pogi = isoWeek(Date.now()) % 4 === 0;
   return `
-  <div class="kicker">Mon espace</div><div class="between"><h1 class="hello">Bonjour <span class="wave">👋</span></h1><button class="sm ghost" data-act="settings">Réglages</button></div>
+  <div class="kicker">Mon espace</div><div class="between"><h1 class="hello">Bonjour <span class="wave">👋</span></h1><div class="row" style="gap:6px;flex-wrap:nowrap">${window.bellHtml ? window.bellHtml() : ''}<button class="sm ghost" data-act="settings">Réglages</button></div></div>
+  ${window.DELOAD && window.DELOAD.active() ? '<div class="dlcard on"><span>🧘</span><div><b>Semaine de décharge en cours</b><small>Charges à 60 %, une série en moins. Ton corps récupère et tu repars plus fort.</small></div><button class="sm" data-ex="deloadoff">Arrêter</button></div>' : window.DELOAD && window.DELOAD.due() ? '<div class="dlcard"><span>🧘</span><div><b>Semaine de décharge conseillée</b><small>Ça fait ' + window.DELOAD.cfg().every + ' semaines d\'affilée : une semaine plus légère pour mieux repartir.</small></div><button class="sm p" data-ex="deloadon">Activer</button></div>' : ''}
   <div class="card streak">${FLAME.replace('class="flame"', `class="flame ${st.n || st.ok ? '' : 'off'}"`)}
     <div><div class="num">${st.n} <span style="font-size:20px">semaine${st.n > 1 ? 's' : ''}</span></div>
     <div class="small" style="color:#d8dae0">${st.ok ? 'Semaine validée, la flamme continue.' : `Cette semaine : ${st.thisWeek}/${S.set.goal} séance${S.set.goal > 1 ? 's' : ''} pour garder la flamme.`}</div>
@@ -128,7 +129,7 @@ function vHome() {
       : `<div class="card next"><p class="tiny">${todays.length ? "Prévue aujourd'hui" : "Conseillée : c'est celle que tu as faite il y a le plus longtemps"}</p><h2>${esc(sug.name)}</h2><p class="mute small">${esc(sug.sub || '')}</p>
       <div class="row" style="margin-top:10px"><button class="p grow" data-act="start" data-sid="${sug.id}">Commencer</button>${spotifyBtn('grow')}</div></div>`}
   ${!S.set.spotify ? `<p class="tiny">Ajoute le lien de ta playlist dans Réglages pour avoir un bouton Spotify ici.</p>` : ''}
-  ${window.calSummary ? (() => { const r = window.calSummary(); return `<button class="card navcard" data-act="tool" data-k="cal"><div><div class="tiny">Objectif nutrition du jour</div><h3>${r.kcal.toLocaleString('fr-FR')} kcal · ${r.p} g de protéines</h3></div><span class="pill">Voir</span></button>`; })() : ''}
+  ${window.NUTRI ? (() => { const r = window.NUTRI.today(); return `<button class="card navcard nutcard" data-act="tool" data-k="nutri"><div style="flex:1"><div class="tiny">Ma nutrition du jour</div><h3>${r.p} / ${r.tp} g de protéines</h3><div class="ch-bar"><i style="width:${Math.min(100, r.p / r.tp * 100)}%;background:#2f6bff"></i></div><small class="tiny">${r.kcal.toLocaleString('fr-FR')} / ${r.tk.toLocaleString('fr-FR')} kcal</small></div><span class="pill">Noter</span></button>`; })() : ''}
   <div class="toolrow"><button data-act="tool" data-k="cm"><b>Charge max</b><small>1RM et charges</small></button><button data-act="tool" data-k="cal"><b>Calories</b><small>Besoins et repas</small></button><button data-act="tool" data-k="al"><b>Allures</b><small>Course à pied</small></button></div>
   <div class="sec">Choisir une autre séance</div>
   <div class="card">${S.program.map(s => { const l = lastDone(s.id); return `<div class="sess"><div><h3>${esc(s.name)}</h3><div class="tiny">${s.ex.length} exercices · ${l ? 'dernière fois ' + dateFr(l) : 'jamais faite'}</div></div><button class="sm" data-act="start" data-sid="${s.id}" ${D ? 'disabled' : ''}>Lancer</button></div>`; }).join('')}
@@ -166,6 +167,8 @@ function vWorkout() {
     ${gymMedia(e)}
     ${e.ss ? '<div class="sstag">Superset</div>' : ''}<h2 class="gex">${esc(e.n)}</h2>
     <p class="gsub">${e.sets.length} séries × ${esc(e.reps)} répétitions · repos ${e.rest} s${meta.m ? ' · ' + esc(meta.m) : ''}</p>
+    ${e.sets.some(x => x.deload) ? '<div class="gmsg deload">🧘 Semaine de décharge : charges à 60 %, une série en moins. Technique parfaite, aucune série à l\'échec.</div>' : ''}
+    ${e.prog ? `<div class="gmsg up">↑ ${esc(e.prog)}</div>` : ''}${e.stag ? `<div class="gmsg stag">⚠ ${esc(e.stag)}</div>` : ''}
     ${D.kind === 'pr' ? `<p class="prhint">${R ? `Record : <b>${R.kg} kg × ${R.r || 1}</b>. Séries E = échauffement, puis tente <b>${r25(R.kg + 2.5)} kg</b>.` : "Pas encore de record ici : monte par paliers jusqu'à une charge lourde pour 3 à 5 reps."}</p>` : ''}
     ${l ? `<div class="gline"><span>↗</span> La dernière fois${L ? ' (' + new Date(L.start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ')' : ''} : <b>${esc(l.filter(x => x.t !== 'e').map(x => num(x.kg) + ' × ' + x.r).join(' / '))}</b></div>` : ''}
     <button class="ghelp ${helpOpen ? 'open' : ''}" data-act="help">↔ Aide pour trouver mes charges</button>
@@ -344,7 +347,11 @@ function start(sid, opts = {}) {
     const l = lastSets(e.id), R = REC.get(e.id);
     let sets = Array.from({ length: +e.sets || 3 }, (_, i) => ({ kg: l ? (l[i] || l.at(-1)).kg : '', r: '', ok: false, t: l && l[i] && l[i].t === 'e' ? 'e' : '' }));
     if (pr && R) sets = [[.5, '8'], [.7, '5'], [.85, '2'], [.925, '1']].map(([p, h]) => ({ kg: r25(R.kg * p), r: '', ok: false, t: 'e', hint: h })).concat([{ kg: r25(R.kg + 2.5), r: '', ok: false, t: '' }, { kg: r25(R.kg + 5), r: '', ok: false, t: '' }]);
-    return { id: e.id, n: e.n, reps: e.reps, rest: +e.rest || 90, q: e.q || e.n + ' technique', state: 'todo', sets };
+    const sg = !pr && window.PROG ? window.PROG.suggest(e) : null;
+    if (sg) sets = sets.map(x => x.t === 'e' ? x : { ...x, kg: sg.kg, up: true });
+    if (!pr && window.DELOAD && window.DELOAD.active()) sets = window.DELOAD.apply(sets);
+    const sn = !sg && window.PROG ? window.PROG.stagnant(e.id) : null;
+    return { id: e.id, n: e.n, reps: e.reps, rest: +e.rest || 90, q: e.q || e.n + ' technique', state: 'todo', sets, prog: sg ? sg.msg : '', stag: sn ? sn.msg : '' };
   };
   const back = opts.date && opts.date < new Date().setHours(0, 0, 0, 0) - 1 ? opts.date + 18 * 36e5 : opts.date ? null : null;
   S.draft = { id: uid(), sid: s ? s.id : '', kind: pr ? 'pr' : '', name: s ? s.name : 'Séance libre', start: back || Date.now(), back: !!(opts.date), cur: 0, rest: null, note: '', ex: s ? s.ex.map(mk) : [] };
@@ -372,6 +379,7 @@ function finish() {
   const chal = window.challengeCheck ? window.challengeCheck() : null; const fresh = checkBadges(); save(); releaseWake();
   const st = streak();
   go('home');
+  const meal = window.NUTRI ? window.NUTRI.afterWorkout() : null;
   const sets = ex.reduce((a, e) => a + e.sets.length, 0), mins = Math.max(1, Math.round((entry.end - entry.start) / 60000));
   const o = document.createElement('div'); o.className = 'endscreen'; o.innerHTML = `<div class="es-in">
     <div class="es-emoji">💪</div><h2>Séance terminée</h2><p class="mute">${esc(entry.name)}</p>
@@ -379,12 +387,15 @@ function finish() {
     ${prs.length ? `<div class="es-rec"><div class="trophy">🏆</div><div><small>Nouveau record${prs.length > 1 ? 's' : ''}</small><b>${prs.map(esc).join(' · ')}</b></div></div>` : ''}
     <div class="es-flame">${FLAME}<div><b class="num">${st.n} semaine${st.n > 1 ? 's' : ''}</b><small>${st.n > before ? 'La flamme grandit ! Semaine validée.' : st.ok ? 'Semaine validée, tu en fais plus.' : 'Continue cette semaine pour la flamme.'}</small></div></div>
     ${fresh.length ? `<div class="es-badges">${fresh.map(b => `<div class="es-badge">${badgeHtml(b, true)}</div>`).join('')}</div>` : ''}
+    ${meal ? `<div class="es-meal"><span>🍽️</span><div><small>Ton repas après la séance</small><b>${esc(meal.n)}</b><em>${esc(meal.items)}</em><em>${meal.kcal} kcal · ${meal.p} g de protéines</em></div><button data-es-meal="${meal.i}">J'ai mangé ça</button></div>` : ''}
     <p class="es-q">Comment s'est passée la séance ?</p>
     <div class="feel">${[['😵', 'Épuisé'], ['😓', 'Difficile'], ['🙂', 'Correct'], ['💪', 'En forme'], ['🔥', 'Au top']].map(([em, l]) => `<button data-feel="${l}"><span>${em}</span><small>${l}</small></button>`).join('')}</div>
     <button class="es-main" data-es="journal">Voir le journal</button><button class="es-sec" data-es="close">Fermer</button></div>`;
   document.body.appendChild(o);
+  if (window.notify) { setTimeout(() => { for (const p of prs) window.notify('🏆', 'Nouveau record', p, { silent: true }); for (const b of fresh) window.notify(b.i, 'Badge débloqué : ' + b.n, b.d, { silent: true }); if (meal) window.notify('🍽️', 'Ton repas après la séance', meal.n + ' · ' + meal.p + ' g de protéines', { silent: true }); }, 50); }
   requestAnimationFrame(() => { o.classList.add('show'); for (const el of o.querySelectorAll('[data-to]')) { const to = +el.dataset.to, t0 = performance.now(); const stp = n => { const k = Math.min(1, (n - t0) / 900), e2 = 1 - Math.pow(1 - k, 3); el.textContent = Math.round(to * e2).toLocaleString('fr-FR'); if (k < 1) requestAnimationFrame(stp); }; requestAnimationFrame(stp); } });
   o.addEventListener('click', ev => {
+    const mb = ev.target.closest('[data-es-meal]'); if (mb) { window.NUTRI.ate(+mb.dataset.esMeal); mb.textContent = 'Noté ✓'; mb.disabled = true; return; }
     const f = ev.target.closest('[data-feel]'); if (f) { entry.feel = f.dataset.feel; save(); for (const x of o.querySelectorAll('[data-feel]')) x.classList.toggle('sel', x === f); return; }
     const a = ev.target.closest('[data-es]'); if (!a) return; o.classList.remove('show'); setTimeout(() => o.remove(), 300); if (a.dataset.es === 'journal') go('progress'); if (chal) setTimeout(() => window.showChallenge(chal), 350);
   });
@@ -468,7 +479,14 @@ function settingsInner() {
   <label style="margin-top:10px">Séances par semaine pour garder la flamme<select id="goal">${[1, 2, 3, 4, 5, 6].map(n => `<option ${n === S.set.goal ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
   <label style="margin-top:10px">Repos entre deux exercices<select id="exrest">${[90, 120, 150, 180, 240].map(n => `<option value="${n}" ${n === S.set.exRest ? 'selected' : ''}>${fmt(n)}</option>`).join('')}</select></label>
   <button class="p wide" style="margin-top:14px" data-act="saveset">Enregistrer</button>
-  <div class="sec">Version</div><p class="tiny">Version 12 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
+  <div class="sec">Notifications et rappels</div>
+  <p class="tiny">Records, badges et idées de repas s'affichent dans la cloche de l'accueil. Les notifications iPhone marchent quand l'app est ouverte (iOS 16.4 ou plus, app ajoutée à l'écran d'accueil).</p>
+  <button class="wide" data-ex="notif">${'Notification' in window && Notification.permission === 'granted' ? 'Notifications activées ✓' : 'Activer les notifications'}</button>
+  <p class="tiny" style="margin-top:10px">Pour être prévenu même app fermée et sans réseau : ajoute tes séances au calendrier de l'iPhone, avec une alerte 30 min avant.</p>
+  <button class="wide" data-ex="ics">Ajouter mes séances au calendrier iPhone</button>
+  <div class="sec">Semaine de décharge</div><p class="tiny">Une semaine plus légère conseillée toutes les :</p>
+  <div class="pills">${[6, 7, 8].map(n => `<button class="${(window.DELOAD ? window.DELOAD.cfg().every : 7) === n ? 'sel' : ''}" data-ex="deloadevery" data-v="${n}">${n} semaines</button>`).join('')}</div>
+  <div class="sec">Version</div><p class="tiny">Version 13 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
   <div class="sec">Sauvegarde</div>
   <p class="tiny">Tout est enregistré sur cet appareil (téléphone ou ordi), sans synchro automatique. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
@@ -494,7 +512,7 @@ document.addEventListener('click', async ev => {
   switch (a) {
     case 'goto': go(b.dataset.v); break;
     case 'upd': b.textContent = 'Recherche…'; try { const r = window.__reg || await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch (e) { } setTimeout(() => location.reload(), 600); break;
-    case 'tool': window.VIEWS.toolsGoto(b.dataset.k); go('tools'); break;
+    case 'tool': window.VIEWS.toolsGoto(b.dataset.k); if (b.dataset.k === 'nutri' && window.NUTRI_GO) window.NUTRI_GO('jour'); go('tools'); break;
     case 'settings': settingsSheet(); break;
     case 'start': if (!S.draft) start(b.dataset.sid); break;
     case 'pick': { const i = +b.dataset.i; D.cur = i; D.rest = null; if (D.ex[i].state !== 'todo') D.ex[i].state = 'todo'; save(); render(); const el = document.querySelectorAll('.ex')[i]; el && el.scrollIntoView({ block: 'start', behavior: 'smooth' }); break; }
@@ -565,7 +583,7 @@ document.addEventListener('click', async ev => {
     case 'copyctx': { const p = coachPrompt(($('#cq').value || '').trim() || '(écris ta question ici)'); try { await navigator.clipboard.writeText(p); toast('Résumé copié : colle-le dans Claude'); } catch (e) { sheet(`<h2>Ton résumé</h2><p class="tiny">Sélectionne le texte et copie-le.</p><textarea rows="12" readonly>${esc(p)}</textarea><button class="wide" style="margin-top:8px" data-close>Fermer</button>`); } break; }
     case 'saveset': { const v = $('#spurl').value.trim(); if (v && !/^https:\/\/(open\.)?spotify\.com\//.test(v) && !/^https:\/\/spotify\.link\//.test(v)) { toast('Colle un lien Spotify (https://open.spotify.com/…)'); break; } S.set.spotify = v; S.set.goal = +$('#goal').value; S.set.exRest = +$('#exrest').value; save(); render(); toast('Réglages enregistrés'); break; }
     case 'export': { b.disabled = true; b.textContent = 'Préparation…'; const withMedia = $('#expmedia')?.checked; let media = [];
-      if (withMedia) { await idbReady; media = await new Promise(res => { if (!idb) return res([]); const q = idb.transaction('media').objectStore('media').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); media = await Promise.all(media.map(m => new Promise(r => { const fr = new FileReader(); fr.onload = () => r({ ex: m.ex, type: m.type, size: m.blob.size, data: fr.result }); fr.onerror = () => r(null); fr.readAsDataURL(m.blob); }))); media = media.filter(Boolean); }
+      if (withMedia) { await idbReady; media = await new Promise(res => { if (!idb) return res([]); const q = idb.transaction('media').objectStore('media').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); media = await Promise.all(media.map(m => new Promise(r => { const fr = new FileReader(); fr.onload = () => r({ ex: m.ex, type: m.type, size: m.blob.size, t: m.t, data: fr.result }); fr.onerror = () => r(null); fr.readAsDataURL(m.blob); }))); media = media.filter(Boolean); }
       const blob = new Blob([JSON.stringify({ app: 'carnet-sport', v: 2, at: Date.now(), program: S.program, lib: S.lib, log: S.log, badges: S.badges, best: S.best, set: S.set, guides: S.guides, cal: S.cal, media })], { type: 'application/json' });
       const name = 'carnet-sport-' + new Date().toISOString().slice(0, 10) + '.json', file = new File([blob], name, { type: 'application/json' });
       try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Carnet sport' }); } else throw 0; } catch (e) { if (e && e.name === 'AbortError') { b.disabled = false; b.textContent = 'Exporter mes données'; break; } const l = document.createElement('a'); l.href = URL.createObjectURL(blob); l.download = name; document.body.appendChild(l); l.click(); l.remove(); }
@@ -590,7 +608,7 @@ document.addEventListener('change', async ev => {
     try { const v = JSON.parse(await t.files[0].text()); if (v.app !== 'carnet-sport' || !Array.isArray(v.log)) throw 0;
       const have = new Set(S.log.map(s => s.id)); for (const s of v.log) if (s && s.id && !have.has(s.id)) S.log.push(s); S.log.sort((a, b) => a.start - b.start);
       if (Array.isArray(v.program) && v.program.length) S.program = v.program; if (Array.isArray(v.lib)) S.lib = v.lib; S.badges = { ...v.badges, ...S.badges }; S.best = Math.max(S.best || 0, v.best || 0); if (v.set) S.set = { ...S.set, ...v.set }; if (v.guides) S.guides = { ...S.guides, ...v.guides }; if (v.cal && !S.cal) S.cal = v.cal;
-      if (Array.isArray(v.media) && v.media.length) { await idbReady; const have = await new Promise(res => { if (!idb) return res([]); const q = idb.transaction('media').objectStore('media').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); let n = 0; for (const m of v.media) { if (!m || typeof m.data !== 'string' || !m.data.startsWith('data:') || have.some(h => h.ex === m.ex && h.blob.size === m.size)) continue; const blob = await (await fetch(m.data)).blob(); await mediaTx(st => st.add({ ex: String(m.ex), blob, type: String(m.type || blob.type) })); n++; } if (n) toast(n + ' photo(s)/vidéo(s) importée(s)'); }
+      if (Array.isArray(v.media) && v.media.length) { await idbReady; const have = await new Promise(res => { if (!idb) return res([]); const q = idb.transaction('media').objectStore('media').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); let n = 0; for (const m of v.media) { if (!m || typeof m.data !== 'string' || !m.data.startsWith('data:') || have.some(h => h.ex === m.ex && h.blob.size === m.size)) continue; const blob = await (await fetch(m.data)).blob(); await mediaTx(st => st.add({ ex: String(m.ex), blob, type: String(m.type || blob.type), ...(m.t ? { t: +m.t } : {}) })); n++; } if (n) toast(n + ' photo(s)/vidéo(s) importée(s)'); }
       refreshRec(); save(); closeSheet(); render(); toast('Données importées'); } catch (e) { toast("Ce fichier n'est pas une sauvegarde Carnet sport"); }
   }
 });
@@ -606,7 +624,10 @@ if ('serviceWorker' in navigator) {
 
 window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid), ding, blip, unlockAudio, wakeOn };
 window.CARNET_fillMedia = fillMedia;
+window.CARNET.media = { ready: () => idbReady, list: mediaFor, tx: mediaTx };
 if (!['home', 'workout', 'program', 'progress', 'tools', 'me'].includes(view)) view = 'home';
 window.applyTheme && window.applyTheme();
+window.weekCountNow = () => weekCounts().get(monday(Date.now())) || 0;
+setTimeout(() => { try { window.dailyChecks && window.dailyChecks(); } catch (e) { console.error(e); } }, 1200);
 checkBadges(); save(); render(); if (S.draft) wake();
 }

@@ -48,6 +48,8 @@ function vCorps() {
   </div>
   <div class="tcard"><div class="eyebrow">Mensurations</div><p class="tiny">Mètre ruban, le matin, au même endroit.</p>
     <div class="meas4">${MEAS.map(([k, l]) => { const m = lastM(k); return `<div class="mini"><small>${l}</small><b>${m ? fr(m[k], 1) + ' cm' : '—'}</b>${m ? `<span class="tiny">${dFr(m.t)}</span>` : ''}</div>`; }).join('')}</div></div>
+  <div class="tcard"><div class="between"><div class="eyebrow" style="margin:0">Photos avant / après</div><label class="btn sm">+ Photo<input type="file" accept="image/*" hidden data-bodyph="1"></label></div>
+    <p class="tiny">Une photo par mois, même endroit, même lumière, même tenue. Elles restent sur ton téléphone.</p><div id="bphotos"><p class="tiny">Chargement…</p></div></div>
   ${ws.length ? `<details class="tcard"><summary>Toutes mes mesures</summary>${[...ws].reverse().map(w => `<div class="between small" style="padding:6px 0;border-top:1px solid var(--line)"><span>${dFr(w.t)}</span><b>${fr(w.kg, 1)} kg</b><button class="sm ghost" data-m="delw" data-t2="${w.t}">Retirer</button></div>`).join('')}</details>` : ''}`;
 }
 function measSheet() {
@@ -114,5 +116,17 @@ document.addEventListener('change', e => {
 });
 const $v = id => (document.getElementById(id) || {}).value || '';
 const num = v => parseFloat(String(v || '').replace(',', '.')) || 0;
-AFTER.me = () => { };
+let cmpI = null;
+AFTER.me = async () => {
+  const box = document.getElementById('bphotos'); if (!box || !C().media) return;
+  await C().media.ready(); const L = (await C().media.list('body')).sort((a, b) => (a.t || a.k) - (b.t || b.k));
+  if (!L.length) { box.innerHTML = '<p class="tiny">Pas encore de photo. Ajoute ta première : elle servira de point de départ.</p>'; return; }
+  const url = m => { const u = URL.createObjectURL(m.blob); return u; }, d = m => new Date(m.t || Date.now()).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' });
+  const a = L[0], b = L[cmpI !== null && L[cmpI] ? cmpI : L.length - 1];
+  box.innerHTML = (L.length > 1 ? `<div class="bacmp" style="--x:50%"><img src="${url(b)}" alt="Après"><div class="ba-before"><img src="${url(a)}" alt="Avant"></div><span class="ba-l">${d(a)}</span><span class="ba-r">${d(b)}</span><i class="ba-h"></i><input type="range" min="0" max="100" value="50" aria-label="Comparer avant et après" data-bacmp="1"></div>` : '')
+    + `<div class="bph">${L.map((x, i) => `<figure class="${x === b ? 'sel' : ''}"><img src="${url(x)}" alt="Photo du ${d(x)}" data-bpsel="${i}"><figcaption>${d(x)}</figcaption><button data-bpdel="${x.k}" aria-label="Supprimer">✕</button></figure>`).join('')}</div>`;
+};
+document.addEventListener('input', e => { if (e.target.dataset.bacmp) e.target.parentElement.style.setProperty('--x', e.target.value + '%'); });
+document.addEventListener('change', async e => { const t = e.target; if (!t.dataset.bodyph || !t.files[0] || !window.CARNET) return; await C().media.ready(); await C().media.tx(st => st.add({ ex: 'body', blob: t.files[0], type: t.files[0].type, t: Date.now() })); C().toast('Photo ajoutée'); cmpI = null; C().render(); });
+document.addEventListener('click', async e => { const s = e.target.closest('[data-bpsel]'), d = e.target.closest('[data-bpdel]'); if (s) { cmpI = +s.dataset.bpsel; AFTER.me(); } if (d) { if (!d.dataset.sure) { d.dataset.sure = 1; d.textContent = 'Sûr ?'; return; } await C().media.tx(st => st.delete(+d.dataset.bpdel)); cmpI = null; AFTER.me(); } });
 }
