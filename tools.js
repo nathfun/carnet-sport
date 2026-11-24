@@ -195,7 +195,7 @@ function vAllures() {
   const pd = Math.max(0.4, Number(a.pdist) || 10), ps = parseT(a.ptime) || 3058;
   const pred = Object.entries(DISTS).map(([k, [d, l]]) => ({ k, l, d, s: ps * Math.pow(d / pd, 1.06) }));
   const vma = a.vma, kmh = v => v, rows = [240, 270, 300, 330, 360, 390, 420]; if (!rows.includes(Math.round(pace / 5) * 5)) rows.push(Math.round(pace / 5) * 5); rows.sort((x, y) => x - y);
-  const marks2 = [['6:00 · débutant', 360], ['5:00 · 10 km en 50 min', 300], ['4:30 · ton objectif', 270], ['4:16 · marathon en 3 h', 256]];
+  const marks2 = [['6:00 · débutant', 360], ['5:00 · 10 km en 50 min', 300], ...(window.PROFILE && window.PROFILE.goal() ? [[window.PROFILE.goalTxt() + ' · ton objectif', window.PROFILE.goal()]] : []), ['4:16 · marathon en 3 h', 256]];
   const maxT = times.at(-1).s;
   return `<p class="lede">Allure ou vitesse : tape l'une, l'autre suit. Tes temps sur 5 km, 10 km, semi et marathon, et tes zones d'entraînement.</p>
   <div class="tool-grid">

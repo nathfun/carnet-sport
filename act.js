@@ -12,7 +12,7 @@ const hms = s => { s = Math.round(s); return s >= 3600 ? Math.floor(s / 3600) + 
 const ZDEF = { hr: [130, 162, 178, 194], pace: [393, 339, 304, 285, 268] };
 const HRZ = [['Z1', 'Récupération', '#9ca3af'], ['Z2', 'Endurance', '#60a5fa'], ['Z3', 'Tempo', '#22c55e'], ['Z4', 'Seuil', '#f59e0b'], ['Z5', 'Anaérobie', '#ef4444']];
 const PZ = [['Z1', 'Récupération', '#9ca3af'], ['Z2', 'Endurance', '#60a5fa'], ['Z3', 'Tempo', '#22c55e'], ['Z4', 'Seuil', '#f59e0b'], ['Z5', 'VO2 max', '#f97316'], ['Z6', 'Anaérobie', '#ef4444']];
-const zones = () => ({ ...ZDEF, ...((C().S().set || {}).zones || {}) });
+const zones = () => window.PROFILE ? window.PROFILE.zones() : ZDEF;
 const mem = new Map();
 const CK = id => location.origin + '/__act/' + id;
 
@@ -130,16 +130,16 @@ function render(l, d) {
   const effHtml = eff.length ? `<section class="tcard"><h2 class="h2s">Meilleurs efforts</h2><table class="efforts">${eff.map(e => `<tr><td>${esc(e.name.replace('1/2 mile', '½ mile'))}</td><td><b>${hms(e.sec)}</b></td><td class="mute">${mmss(e.sec / (e.dist / 1000))}/km</td><td>${e.pr === 1 ? '<span class="prb gold">🏆 Record</span>' : e.pr === 2 ? '<span class="prb">2ᵉ temps</span>' : e.pr === 3 ? '<span class="prb">3ᵉ temps</span>' : ''}</td></tr>`).join('')}</table><p class="tiny">Calculés par Strava sur cette sortie. « Record » = ton meilleur temps de tous les temps sur la distance.</p></section>` : '';
   const hrT = s.hr.length ? zoneTimes(d, i => s.hr[i], Z.hr, 5) : null;
   const hrL = [`≤ ${Z.hr[0]}`, `${Z.hr[0] + 1}–${Z.hr[1]}`, `${Z.hr[1] + 1}–${Z.hr[2]}`, `${Z.hr[2] + 1}–${Z.hr[3]}`, `> ${Z.hr[3]}`];
-  const pT = run && s.v.length ? zoneTimes(d, i => s.v[i] > 1.2 ? -1000 / s.v[i] : null, Z.pace.map(x => -x), 6) : null;
+  const pT = run && s.v.length && Z.pace ? zoneTimes(d, i => s.v[i] > 1.2 ? -1000 / s.v[i] : null, Z.pace.map(x => -x), 6) : null;
   // pour l'allure, plus petit = plus rapide : on compare sur -allure
-  const pL = [`> ${mmss(Z.pace[0])}`, `${mmss(Z.pace[1])}–${mmss(Z.pace[0])}`, `${mmss(Z.pace[2])}–${mmss(Z.pace[1])}`, `${mmss(Z.pace[3])}–${mmss(Z.pace[2])}`, `${mmss(Z.pace[4])}–${mmss(Z.pace[3])}`, `< ${mmss(Z.pace[4])}`];
+  const pL = !Z.pace ? [] : [`> ${mmss(Z.pace[0])}`, `${mmss(Z.pace[1])}–${mmss(Z.pace[0])}`, `${mmss(Z.pace[2])}–${mmss(Z.pace[1])}`, `${mmss(Z.pace[3])}–${mmss(Z.pace[2])}`, `${mmss(Z.pace[4])}–${mmss(Z.pace[3])}`, `< ${mmss(Z.pace[4])}`];
   const charts = `${pace.length ? `<section class="tcard"><div class="between"><h2 class="h2s">${run ? 'Allure' : 'Vitesse'}</h2><small class="mute">Survole le graphique : le point bouge aussi sur la carte</small></div>
-      ${run ? chart('pace', d, pace, { name: 'Allure', fmt: v => mmss(v) + '/km', invert: true, color: '#2563eb', alt: s.alt, ref: 270, refLbl: 'objectif 4:30', avg: avgP, lo: Math.min(pct(pace, .02), 255), hi: pct(pace, .97) + 10 }) : chart('spd', d, spd, { name: 'Vitesse', fmt: v => fr(v, 0) + ' km/h', color: '#2563eb', alt: s.alt, avg: avgV, lo: 0 })}
-      <p class="tiny">Plus la courbe est haute, plus tu vas vite. Le pointillé bleu, c'est ta moyenne${run ? ', le vert ton objectif 4:30/km' : ''}. Le relief gris, c'est l'altitude.</p></section>` : ''}
+      ${run ? chart('pace', d, pace, { name: 'Allure', fmt: v => mmss(v) + '/km', invert: true, color: '#2563eb', alt: s.alt, ref: window.PROFILE.goal(), refLbl: 'objectif ' + window.PROFILE.goalTxt(), avg: avgP, lo: Math.min(pct(pace, .02), (window.PROFILE.goal() || 999) - 15), hi: pct(pace, .97) + 10 }) : chart('spd', d, spd, { name: 'Vitesse', fmt: v => fr(v, 0) + ' km/h', color: '#2563eb', alt: s.alt, avg: avgV, lo: 0 })}
+      <p class="tiny">Plus la courbe est haute, plus tu vas vite. Le pointillé bleu, c'est ta moyenne${run && window.PROFILE.goal() ? ', le vert ton objectif' : ''}. Le relief gris, c'est l'altitude.</p></section>` : ''}
     ${s.hr.length ? `<section class="tcard"><h2 class="h2s">Fréquence cardiaque</h2>${chart('hr', d, smooth(s.hr, 2), { name: 'FC', fmt: v => Math.round(v) + ' bpm', color: '#dc2626', avg: d.hrAvg, lo: Math.min(pct(s.hr, .01), Z.hr[0]) - 5, hi: Math.max(pct(s.hr, .995), Z.hr[2]) + 5, bands: [[0, Z.hr[0], HRZ[0][2]], [Z.hr[0], Z.hr[1], HRZ[1][2]], [Z.hr[1], Z.hr[2], HRZ[2][2]], [Z.hr[2], Z.hr[3], HRZ[3][2]], [Z.hr[3], 250, HRZ[4][2]]] })}<p class="tiny">Les bandes de couleur sont tes zones de Z1 (gris) à Z5 (rouge).</p></section>` : ''}
     ${s.alt.length && !pace.length ? `<section class="tcard"><h2 class="h2s">Altitude</h2>${chart('alt', d, s.alt, { name: 'Altitude', fmt: v => Math.round(v) + ' m', color: '#6b7280' })}</section>` : ''}`;
-  const zonesHtml = (hrT ? zoneBlock('Zones de fréquence cardiaque', 'Zones de ton compte Strava, calculées sur ta FC max estimée selon ton âge. Pour progresser vers 4:30/km : beaucoup de Z2, un peu de Z4-Z5.', HRZ, hrT, hrL) : '')
-    + (pT ? zoneBlock("Zones d'allure", 'Zones de ton compte Strava, calculées à partir de ton 5 km en 24:00. Strava les mesure en allure ajustée à la pente, ici c\'est l\'allure réelle.', PZ, pT, pL) : '');
+  const zonesHtml = (hrT ? zoneBlock('Zones de fréquence cardiaque', (Z.src === 'strava' ? 'Zones de ton compte Strava, calculées sur ta FC max estimée selon ton âge.' : `Zones calculées sur ta FC max (${window.PROFILE.fcmax()} bpm, modifiable dans Réglages).`) + ' Pour progresser : beaucoup de Z2, un peu de Z4-Z5.', HRZ, hrT, hrL) : '')
+    + (pT ? zoneBlock("Zones d'allure", 'Zones de ton compte Strava. Strava les mesure en allure ajustée à la pente, ici c\'est l\'allure réelle.', PZ, pT, pL) : '');
   return `<div class="kpis act">${k.map(([a, b]) => `<div><small>${a}</small><b>${b}</b></div>`).join('')}</div>
     ${mapSvg(d)}
     <div class="actgrid"><div>${splitsHtml}</div><div>${effHtml}${zonesHtml}</div></div>

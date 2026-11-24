@@ -1,13 +1,15 @@
-/* Synchro iPhone ↔ ordi via le serveur Cloudflare.
+/* Compte + synchro via le serveur Cloudflare (un compte par personne).
    Hors ligne d'abord : tout reste enregistré sur l'appareil, la synchro se fait dès qu'il y a du réseau.
    Fusion : séances (log) réunies par id, le reste « le plus récent gagne » rubrique par rubrique. */
 (() => {
 const C = () => window.CARNET;
 const CFG_KEY = 'carnet-sync';
-const LOCAL = new Set(['_mt', '_ldel', '_mdel', 'inbox', 'seen']);
+const SERVER = 'https://carnet-sport-sync.nathanbouvier45.workers.dev';
+const LOCAL = new Set(['_mt', '_ldel', '_mdel', '_owner', 'inbox', 'seen']);
 let cfg = {}; try { cfg = JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch (e) { }
 const saveCfg = () => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) { } };
-const on = () => !!(cfg.url && cfg.key);
+const base = () => (cfg.url || SERVER).replace(/\/+$/, '');
+const on = () => !!cfg.token;
 let snap = null, lastIds = null, dirty = false, busy = false, timer = null, status = '', applying = false;
 
 /* ---------- suivi des modifications (appelé à chaque enregistrement) ---------- */
@@ -30,10 +32,11 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : D
 
 /* ---------- appels au serveur ---------- */
 async function api(path, opt = {}) {
-  const r = await fetch(cfg.url.replace(/\/+$/, '') + path, { ...opt, cache: 'no-store', headers: { Authorization: 'Bearer ' + cfg.key, ...(opt.headers || {}) } });
-  if (r.status === 401) throw new Error('cle');
+  const r = await fetch(base() + path, { ...opt, cache: 'no-store', headers: { ...(cfg.token ? { Authorization: 'Bearer ' + cfg.token } : {}), ...(opt.headers || {}) } });
+  if (r.status === 401 && cfg.token && !opt.noLogout) { cfg.token = null; cfg.expired = true; saveCfg(); setTimeout(() => C() && C().render(), 0); throw new Error('cle'); }
   return r;
 }
+async function post(path, body, extra = {}) { const r = await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), ...extra }); let j = {}; try { j = await r.json(); } catch (e) { } if (!r.ok) throw new Error(j.error || 'Erreur ' + r.status); return j; }
 
 /* ---------- fusion ---------- */
 function merge(S, R) {
@@ -82,13 +85,13 @@ async function syncMedia(S) {
   const del = new Set(S._mdel || []);
   const remote = await (await api('/media')).json(), rset = new Set(remote.map(r => r.uid)), lset = new Set(local.map(m => m.uid));
   let up = 0, down = 0, skipped = 0;
-  // suppressions
-  const goneLocal = local.filter(m => del.has(m.uid));
+  // suppressions (dont les GIF partagés que Nathan a retirés)
+  const goneLocal = local.filter(m => del.has(m.uid) || (m.shared && !rset.has(m.uid)));
   if (goneLocal.length) await C().media.tx(st => { for (const m of goneLocal) st.raw.delete(m.k); });
-  for (const r of remote) if (del.has(r.uid)) await api('/media/' + r.uid, { method: 'DELETE' });
+  for (const r of remote) if (del.has(r.uid) && !r.shared) await api('/media/' + r.uid, { method: 'DELETE' });
   // envois
   for (const m of local) {
-    if (del.has(m.uid) || rset.has(m.uid)) continue;
+    if (m.shared || del.has(m.uid) || rset.has(m.uid)) continue;
     if (m.blob.size > 24 * 1024 * 1024) { skipped++; continue; }
     const r = await api('/media/' + m.uid, { method: 'PUT', body: m.blob, headers: { 'Content-Type': m.type || m.blob.type || 'application/octet-stream', 'X-Ex': encodeURIComponent(m.ex), 'X-T': String(m.t || '') } });
     if (r.ok) up++;
@@ -98,7 +101,7 @@ async function syncMedia(S) {
     if (del.has(r.uid) || lset.has(r.uid)) continue;
     const res = await api('/media/' + r.uid); if (!res.ok) continue;
     const blob = await res.blob();
-    await C().media.tx(st => st.raw.add({ uid: r.uid, ex: r.ex, type: r.type || blob.type, t: r.t, blob }));
+    await C().media.tx(st => st.raw.add({ uid: r.uid, ex: r.ex, type: r.type || blob.type, t: r.t, blob, ...(r.shared ? { shared: true } : {}) }));
     down++;
   }
   return { up, down, skipped };
@@ -112,7 +115,7 @@ async function run(opts = {}) {
     const S = C().S(); track(S);
     if (cfg.strava) { try { const q = await api('/strava/pull' + (opts.loud ? '?force=1' : ''), { method: 'POST' }); if (q.ok) { const j = await q.json(); if (j.added > 0) cfg.stravaNew = j.added; } } catch (_) { } }
     let r = await (await api('/state')).json();
-    if (r.data && !cfg.rev && !opts.choice) { busy = false; setStatus(''); return firstChoice(); }
+    if (r.data && !cfg.rev && !opts.choice) { if (!(S.log || []).length && !Object.keys(S._mt || {}).length) opts.choice = 'theirs'; else { busy = false; setStatus(''); return firstChoice(); } }
     if (opts.choice === 'mine') { const now = Date.now(); for (const k of Object.keys(S)) if (!LOCAL.has(k)) S._mt[k] = now; }
     if (opts.choice === 'theirs') S._mt = {};
     for (let tries = 0; tries < 3; tries++) {
@@ -133,8 +136,8 @@ async function run(opts = {}) {
     if (cfg.stravaNew) { C().toast(cfg.stravaNew + ' sortie(s) Strava ajoutée(s)'); cfg.stravaNew = 0; saveCfg(); }
     else if (opts.loud) C().toast('Synchronisé ✓');
   } catch (e) {
-    setStatus(e.message === 'cle' ? '✕ Clé refusée par le serveur' : '✕ Pas de connexion au serveur');
-    if (opts.loud) C().toast(e.message === 'cle' ? 'Clé de synchro refusée' : 'Serveur de synchro injoignable');
+    setStatus(e.message === 'cle' ? '✕ Session expirée : reconnecte-toi' : '✕ Pas de connexion au serveur');
+    if (opts.loud) C().toast(e.message === 'cle' ? 'Session expirée : reconnecte-toi' : 'Serveur injoignable');
   }
   busy = false;
 }
@@ -142,24 +145,30 @@ function setStatus(t) { status = t; const el = document.getElementById('syncst')
 const lastTxt = () => cfg.last ? 'Dernière synchro : ' + new Date(cfg.last).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Jamais synchronisé';
 
 function firstChoice() {
-  C().sheet(`<h2>Première synchro</h2><p>Le serveur contient déjà les données d'un autre appareil. Lesquelles garder pour le programme, les réglages et le reste ?</p>
+  C().sheet(`<h2>Première synchro</h2><p>Ton compte contient déjà des données (depuis un autre appareil). Lesquelles garder pour le programme, les réglages et le reste ?</p>
   <p class="tiny">Dans les deux cas, les séances des deux appareils sont réunies, rien n'est perdu.</p>
   <button class="p wide" data-sync="theirs">Prendre celles de l'autre appareil</button>
   <button class="wide" style="margin-top:8px" data-sync="mine">Garder celles de cet appareil</button>
   <button class="ghost wide" style="margin-top:8px" data-close>Annuler</button>`);
 }
 
-/* ---------- réglages ---------- */
+/* ---------- réglages : mon compte ---------- */
+const escA = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function html() {
-  return `<div class="sec">Synchro iPhone ↔ ordi</div>
-  <p class="tiny">Tes séances, programmes, réglages et photos passent d'un appareil à l'autre dès qu'il y a du réseau. À la salle sans réseau, rien ne change : ça se synchronise en sortant.</p>
-  <label style="margin-top:8px">Adresse du serveur<input id="syncurl" value="${(cfg.url || '').replace(/"/g, '&quot;')}" placeholder="https://carnet-sport-sync.….workers.dev" inputmode="url" autocapitalize="off" autocomplete="off"></label>
-  <label style="margin-top:8px">Clé de synchro<input id="synckey" type="password" value="${(cfg.key || '').replace(/"/g, '&quot;')}" placeholder="Colle ta clé" autocapitalize="off" autocomplete="off"></label>
-  <div class="row" style="margin-top:8px"><button class="sm" data-sync="gen">Créer une clé</button><button class="sm" data-sync="show">Afficher / masquer</button></div>
-  <button class="p wide" style="margin-top:10px" data-sync="save">${on() ? 'Synchroniser maintenant' : 'Activer la synchro'}</button>
-  <p class="tiny" id="syncst" style="margin-top:6px">${status || (on() ? lastTxt() : 'Synchro désactivée')}</p>
-  ${on() ? '<button class="ghost wide sm" data-sync="off">Désactiver sur cet appareil</button>' : ''}
-  ${on() ? `<div class="sec">Strava</div><p class="tiny" id="stravast">Vérification…</p><div id="stravabtn"></div>` : ''}`;
+  if (!on()) return `<div class="sec">Compte</div><p class="tiny">Tu utilises l'app sans compte : tout reste sur cet appareil, sans synchro ni amis.</p><button class="p wide" data-sync="login">Me connecter ou créer un compte</button>`;
+  const u = cfg.user || {};
+  return `<div class="sec">Mon compte</div>
+  <div class="acc"><span class="acc-av">${escA((u.name || u.u || '?').slice(0, 1).toUpperCase())}</span><div><b>${escA(u.name || u.u)}</b><small>@${escA(u.u)}${u.admin ? ' · administrateur' : ''}</small></div></div>
+  <p class="tiny" id="syncst" style="margin-top:8px">${status || lastTxt()}</p>
+  <div class="row"><button class="sm grow" data-sync="save">Synchroniser maintenant</button><button class="sm grow" data-sync="invite">Inviter un ami</button></div>
+  <details class="accd"><summary>Changer mon mot de passe</summary><label>Mot de passe actuel<input type="password" id="pwold" autocomplete="current-password"></label><label>Nouveau mot de passe<input type="password" id="pwnew" autocomplete="new-password"></label><button class="sm" style="margin-top:8px" data-sync="pw">Changer</button></details>
+  ${u.admin ? `<details class="accd"><summary>Administration (profils de la famille)</summary>
+    <p class="tiny">Crée un profil pour quelqu'un (ex. ton père), puis donne-lui son pseudo et son mot de passe.</p>
+    <label>Prénom<input id="adname"></label><label>Pseudo<input id="adu" autocapitalize="off" autocomplete="off"></label><label>Mot de passe provisoire<input id="adpw" autocomplete="off"></label>
+    <div class="row" style="margin-top:8px"><button class="sm p" data-sync="adcreate">Créer le profil</button><button class="sm" data-sync="adreset">Réinitialiser son mot de passe</button></div>
+    <div id="adlist" class="tiny" style="margin-top:8px"></div><button class="sm ghost" data-sync="adlist">Voir tous les profils</button></details>` : ''}
+  <button class="ghost wide sm" style="margin-top:10px" data-sync="logout">Me déconnecter de cet appareil</button>
+  ${u.admin || cfg.strava ? `<div class="sec">Strava</div><p class="tiny" id="stravast">Vérification…</p><div id="stravabtn"></div>` : ''}`;
 }
 async function stravaBox() {
   const st = document.getElementById('stravast'), bx = document.getElementById('stravabtn'); if (!st || !on()) return;
@@ -172,24 +181,36 @@ async function stravaBox() {
   } catch (e) { st.textContent = 'Serveur injoignable pour le moment.'; }
 }
 document.addEventListener('click', async e => {
-  const b = e.target.closest('[data-sync]'); if (!b) return; const a = b.dataset.sync;
-  const ki = document.getElementById('synckey'), ui = document.getElementById('syncurl');
-  if (a === 'gen') { const v = Array.from(crypto.getRandomValues(new Uint8Array(24)), x => 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[x % 56]).join(''); ki.value = v; ki.type = 'text'; try { await navigator.clipboard.writeText(v); C().toast('Clé créée et copiée'); } catch (_) { C().toast('Clé créée : copie-la'); } }
-  else if (a === 'show') ki.type = ki.type === 'password' ? 'text' : 'password';
-  else if (a === 'save') {
-    const url = ui.value.trim(), key = ki.value.trim();
-    if (!/^https:\/\/[^ ]+$/.test(url)) return C().toast("L'adresse doit commencer par https://");
-    if (key.length < 16) return C().toast('La clé doit faire au moins 16 caractères');
-    if (url !== cfg.url || key !== cfg.key) { cfg = { url, key }; saveCfg(); }
-    await run({ loud: true });
-  }
-  else if (a === 'off') { cfg = {}; saveCfg(); C().toast('Synchro désactivée sur cet appareil'); C().render(); }
-  else if (a === 'slink') { try { const j = await (await api('/strava/link', { method: 'POST' })).json(); if (j.url) location.href = j.url; else C().toast(j.error || 'Erreur'); } catch (_) { C().toast('Serveur injoignable'); } }
-  else if (a === 'spull') { cfg.strava = true; saveCfg(); await run({ loud: true }); stravaBox(); }
-  else if (a === 'sunlink') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Sûr ?'; return; } await api('/strava/unlink', { method: 'POST' }).catch(() => { }); cfg.strava = false; saveCfg(); C().toast('Strava déconnecté'); stravaBox(); }
-  else if (a === 'mine' || a === 'theirs') { C().closeSheet(); await run({ choice: a, loud: true }); }
+  const b = e.target.closest('[data-sync]'); if (!b) return; const a = b.dataset.sync, v = id => (document.getElementById(id) || {}).value || '';
+  try {
+    if (a === 'save') await run({ loud: true });
+    else if (a === 'login') { cfg.local = false; saveCfg(); C().render(); }
+    else if (a === 'logout') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Sûr ? Tes données seront retirées de cet appareil (elles restent sur ton compte)'; return; } await run(); try { await api('/auth/logout', { method: 'POST' }); } catch (_) { } await wipe(); }
+    else if (a === 'invite') { const j = await post('/invite'); const txt = `Rejoins-moi sur Carnet sport : ${j.url}`; try { if (navigator.share) { await navigator.share({ text: txt }); return; } } catch (_) { return; } try { await navigator.clipboard.writeText(j.url); C().toast("Lien d'invitation copié (valable 30 jours)"); } catch (_) { C().sheet(`<h2>Lien d'invitation</h2><p class="small">${escA(j.url)}</p><button class="ghost wide" data-close>Fermer</button>`); } }
+    else if (a === 'pw') { await post('/me', { old: v('pwold'), pass: v('pwnew') }); C().toast('Mot de passe changé'); document.getElementById('pwold').value = document.getElementById('pwnew').value = ''; }
+    else if (a === 'adcreate') { const j = await post('/admin/users', { name: v('adname'), u: v('adu'), pass: v('adpw') }); C().toast('Profil @' + j.u + ' créé'); }
+    else if (a === 'adreset') { await post('/admin/reset', { u: v('adu'), pass: v('adpw') }); C().toast('Mot de passe de @' + v('adu').toLowerCase() + ' changé'); }
+    else if (a === 'adlist') { const L = await (await api('/admin/users')).json(); document.getElementById('adlist').innerHTML = L.map(x => `<div>• <b>${escA(x.name)}</b> @${escA(x.u)}${x.admin ? ' (admin)' : ''}</div>`).join(''); }
+    else if (a === 'slink') { const j = await post('/strava/link'); if (j.url) location.href = j.url; }
+    else if (a === 'spull') { cfg.strava = true; saveCfg(); await run({ loud: true }); stravaBox(); }
+    else if (a === 'sunlink') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Sûr ?'; return; } await post('/strava/unlink'); cfg.strava = false; saveCfg(); C().toast('Strava déconnecté'); stravaBox(); }
+    else if (a === 'mine' || a === 'theirs') { C().closeSheet(); await run({ choice: a, loud: true }); }
+  } catch (err) { C().toast(err.message === 'Failed to fetch' ? 'Pas de connexion au serveur' : err.message); }
 });
-
+async function wipe() {
+  cfg = { url: cfg.url }; saveCfg();
+  try { localStorage.removeItem('carnet-sport.v1'); } catch (_) { }
+  try { await C().media.ready(); await C().media.tx(st => st.raw.clear()); } catch (_) { }
+  try { await caches.delete('carnet-acts'); } catch (_) { }
+  location.reload();
+}
+/* connexion : appelée par l'écran de connexion */
+async function signIn(j) {
+  const S = C().S();
+  if (S._owner && S._owner !== j.user.u) { cfg = { url: cfg.url, token: j.token, user: j.user }; saveCfg(); localStorage.removeItem('carnet-sport.v1'); try { await C().media.tx(st => st.raw.clear()); } catch (_) { } location.reload(); return; }
+  cfg = { url: cfg.url, token: j.token, user: j.user, rev: (j.claimed || (cfg.key && j.user.admin)) ? cfg.rev : undefined, strava: (j.claimed || (cfg.key && j.user.admin)) ? cfg.strava : false }; saveCfg();
+  S._owner = j.user.u; C().save();
+}
 /* ---------- déclencheurs ---------- */
 addEventListener('online', () => run());
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') run(); else if (dirty) run(); });
@@ -197,5 +218,5 @@ setTimeout(() => run(), 1500);
 new MutationObserver(() => { const st = document.getElementById('stravast'); if (st && !st.dataset.done) { st.dataset.done = 1; stravaBox(); } }).observe(document.body, { childList: true, subtree: true });
 if (/[?&]strava=/.test(location.search)) history.replaceState(null, '', location.pathname);
 
-window.SYNC = { track, run, html, on, uid, get: async path => { const r = await api(path); if (!r.ok) throw new Error('http ' + r.status); return r.json(); }, tomb: u => { const S = C() && C().S(); if (S && u) { S._mdel = S._mdel || []; if (!S._mdel.includes(u)) S._mdel.push(u); dirty = true; C().save(); } } };
+window.SYNC = { track, run, html, on, uid, api, base, post, signIn, wipe, cfg: () => cfg, saveCfg: () => saveCfg(), setLocal: x => { cfg.local = x; saveCfg(); }, get: async path => { const r = await api(path); if (!r.ok) throw new Error('http ' + r.status); return r.json(); }, tomb: u => { const S = C() && C().S(); if (S && u) { S._mdel = S._mdel || []; if (!S._mdel.includes(u)) S._mdel.push(u); dirty = true; C().save(); } } };
 })();

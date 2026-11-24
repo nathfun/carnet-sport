@@ -1,8 +1,8 @@
 // Garde l'app sur le téléphone pour qu'elle s'ouvre sans réseau.
 // Avec du réseau : on prend toujours la version en ligne (et on met la copie à jour).
 // Sans réseau (ou réseau trop lent) : on sert la copie du téléphone.
-const VERSION = 'carnet-v25';
-const FILES = ['./', 'index.html', 'style.css', 'library.js', 'body.js', 'plan.js', 'models.js', 'journal.js', 'tools.js', 'chrono.js', 'nutri.js', 'me.js', 'extras.js', 'sync.js', 'desk.js', 'act.js', 'app.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+const VERSION = 'carnet-v26';
+const FILES = ['./', 'index.html', 'style.css', 'library.js', 'body.js', 'plan.js', 'models.js', 'journal.js', 'tools.js', 'chrono.js', 'nutri.js', 'me.js', 'extras.js', 'sync.js', 'desk.js', 'act.js', 'auth.js', 'app.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(FILES.map(f => fetch(new Request(f, { cache: 'reload' })).then(r => r.ok && c.put(f, r)).catch(() => { })))).then(() => self.skipWaiting()));
