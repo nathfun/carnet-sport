@@ -76,7 +76,7 @@ function vMonth() {
 }
 VIEWS.seances = () => {
   const tabs = `<div class="kicker">Entraînement</div><div class="between"><h1>Mes séances</h1><button class="p sm" data-pl="new" data-d="${day0(Date.now())}">+ Séance</button></div><div class="seg" style="margin:12px 0">${[['cal', 'Calendrier'], ['modeles', 'Mes modèles'], ['exos', 'Exercices']].map(([k, l]) => `<button class="${sub === k ? 'sel' : ''}" data-pl="sub" data-v="${k}">${l}</button>`).join('')}</div>`;
-  if (sub === 'modeles') return tabs + C().vProgram();
+  if (sub === 'modeles') return tabs + VIEWS.models();
   if (sub === 'exos') return tabs + C().vExos();
   return tabs + seg2() + (mode === 'semaine' ? vWeek() : vMonth()) + `<div id="sdet">${detail()}</div>`;
 };
@@ -101,12 +101,12 @@ function bindSlides() {
 }
 
 /* nouvelle séance */
-function newSheet(t) {
+function newSheet(t, fromId) {
   const S = C().S(), d = new Date(+t).getDay();
   window.__np = { kind: 'muscu', days: [d], repeat: 'once', moment: 'apm', date: +t, from: '' };
   C().sheet(`<h2>Nouvelle séance</h2><div class="tiny" style="margin-top:6px">Quel genre de séance ?</div>
     <div class="kinds">${Object.entries(KIND).map(([k, l]) => `<button class="${k === 'muscu' ? 'sel' : ''}" data-np="kind" data-v="${k}"><b>${l}</b><small>${k === 'muscu' ? 'Exercices, séries, charges, repos' : 'Suivie dans Strava'}</small></button>`).join('')}</div>
-    <div id="npmuscu"><label class="lbl">Partir de<select id="npfrom"><option value="">Une nouvelle séance vide</option>${S.program.map(p => `<option value="${esc(p.id)}">${esc(p.name)} (${p.ex.length} exos)</option>`).join('')}</select></label></div>
+    <div id="npmuscu"><label class="lbl">Partir de<select id="npfrom"><option value="">Une nouvelle séance vide</option>${S.program.map(p => `<option value="${esc(p.id)}" ${p.id === fromId ? 'selected' : ''}>${esc(p.name)} (${p.ex.length} exos)</option>`).join('')}</select></label></div>
     <label class="lbl">Nom (facultatif)<input id="npname" placeholder="Ex. Musculation · lundi après-midi"></label>
     <div class="tiny" style="margin-top:12px">Jours</div><div class="dpick">${[1, 2, 3, 4, 5, 6, 0].map((x, i) => `<button class="${x === d ? 'sel' : ''}" data-np="day" data-v="${x}">${DL[i]}</button>`).join('')}</div>
     <div class="tiny" style="margin-top:12px">Répéter cette séance ?</div>
@@ -156,7 +156,7 @@ document.addEventListener('click', e => {
     case 'skip': { const p = plans().find(x => x.id === v); p.skip = [...(p.skip || []), iso(sel.date)]; sel = null; C().toast('Séance retirée pour ce jour'); break; }
     case 'delplan': { const p = plans().find(x => x.id === v); if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = p.repeat === 'week' ? 'Toucher encore : retirer toutes les semaines' : 'Toucher encore pour retirer'; return; } S.plans = plans().filter(x => x.id !== v); sel = null; break; }
     case 'addex': C().addExSheet('program', +v); return;
-    case 'edit': sub = 'modeles'; break;
+    case 'edit': sub = 'modeles'; { const pp = plans().find(x => x.id === (sel && sel.pid)); if (pp) VIEWS.modelsOpen(pp.sid); } break;
     case 'redo': C().start(v); return;
     case 'journal': C().go('progress'); return;
     case 'logit': C().start(v, { date: d }); return;
@@ -166,6 +166,8 @@ document.addEventListener('click', e => {
   C().save(); C().render();
 });
 const $ = s => document.querySelector(s);
+VIEWS.planNew = sid => newSheet(day0(Date.now()), sid);
+VIEWS.nextPlanned = () => { for (let k = 0; k < 14; k++) { const t = addD(day0(Date.now()), k), ps = plansOn(t).filter(p => !isDone(p, t)); if (ps.length) return { label: (k === 0 ? "Aujourd'hui" : k === 1 ? 'Demain' : fDay(t)) + ' · ' + (MOM[ps[0].moment] || '').toLowerCase(), name: planName(ps[0]) }; } return null; };
 VIEWS.plannedToday = () => { const t = day0(Date.now()); return plansOn(t).filter(p => !isDone(p, t)); };
 VIEWS.selectPlan = (pid, date) => { sel = { date, pid }; sub = 'cal'; };
 }

@@ -95,26 +95,9 @@ function streak() {
 const tonnage = () => S.log.reduce((a, s) => a + (s.vol || 0), 0);
 const prCount = () => S.log.reduce((a, s) => a + (s.prs || []).length, 0);
 const setTag = t => ({ e: 'E', d: 'D', f: 'F' }[t] || '');
-const BADGES = [
-  { id: 'first', t: 1, i: '1', n: 'Première séance', ok: () => S.log.length >= 1 },
-  { id: 's10', t: 1, i: '10', n: '10 séances', ok: () => S.log.length >= 10 },
-  { id: 's25', t: 2, i: '25', n: '25 séances', ok: () => S.log.length >= 25 },
-  { id: 's50', t: 3, i: '50', n: '50 séances', ok: () => S.log.length >= 50 },
-  { id: 's100', t: 4, i: '100', n: '100 séances', ok: () => S.log.length >= 100 },
-  { id: 'w4', t: 1, i: '4', n: '4 semaines de feu', ok: () => S.best >= 4 },
-  { id: 'w8', t: 2, i: '8', n: '8 semaines de feu', ok: () => S.best >= 8 },
-  { id: 'w12', t: 3, i: '12', n: '12 semaines de feu', ok: () => S.best >= 12 },
-  { id: 'w26', t: 4, i: '26', n: '6 mois de feu', ok: () => S.best >= 26 },
-  { id: 't10', t: 1, i: '10 t', n: '10 tonnes soulevées', ok: () => tonnage() >= 1e4 },
-  { id: 't50', t: 2, i: '50 t', n: '50 tonnes soulevées', ok: () => tonnage() >= 5e4 },
-  { id: 't100', t: 3, i: '100 t', n: '100 tonnes soulevées', ok: () => tonnage() >= 1e5 },
-  { id: 'pr5', t: 1, i: 'PR', n: '5 records battus', ok: () => prCount() >= 5 },
-  { id: 'pr25', t: 3, i: 'PR', n: '25 records battus', ok: () => prCount() >= 25 },
-  { id: 'early', t: 2, i: '7h', n: 'Séance avant 8h', ok: () => S.log.some(s => new Date(s.start).getHours() < 8) },
-  { id: 'long', t: 2, i: '90', n: 'Séance de 1h30', ok: () => S.log.some(s => s.end - s.start >= 5400e3) }
-];
+const BADGES = window.BADGES2;
 function checkBadges() { const fresh = []; S.best = Math.max(S.best || 0, streak().n); for (const b of BADGES) if (!S.badges[b.id] && b.ok()) { S.badges[b.id] = Date.now(); fresh.push(b); } return fresh; }
-const badgeHtml = (b, on) => `<div class="badge ${on ? 't' + b.t : 'lock'}"><b>${esc(b.i)}</b>${esc(b.n)}</div>`;
+const badgeHtml = (b, on) => window.medal(b, on);
 
 /* ---------- rendu ---------- */
 const app = $('#app');
@@ -122,7 +105,7 @@ function go(v) { view = v; render(); window.scrollTo(0, 0); }
 function render() {
   for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('sel', b.dataset.view === view);
   const V = window.VIEWS || {};
-  app.innerHTML = ({ home: vHome, workout: vWorkout, program: V.seances, progress: vProgress, tools: V.tools, me: V.me }[view] || vHome)();
+  app.innerHTML = ({ home: vHome, workout: vWorkout, program: V.seances, progress: V.journal, tools: V.tools, me: V.me }[view] || vHome)();
   document.body.dataset.view = view;
   const A = (window.AFTER || {})[view]; if (A) try { A(); } catch (e) { console.error(e); }
   if (view === 'workout' && S.draft) { const c = S.draft.ex[S.draft.cur]; if (c) { fillMedia(c.id); fillGymMedia(c.id); } }
@@ -155,8 +138,8 @@ function vHome() {
     <h3 style="margin-top:12px">Vélo : ${pogi ? 'sortie « Pogačar » 60 km' : 'endurance 50–70 km'}</h3><p class="small mute">${pogi ? '4 à 5 efforts de 5 min en côte, récup 3–4 min.' : 'Zone 2 : tu dois pouvoir parler. Cadence 85–95.'}</p>
     <a class="btn wide" style="margin-top:8px" href="https://www.strava.com/dashboard" target="_blank" rel="noopener">Ouvrir Strava</a>
     <p class="tiny" style="margin-top:8px">Pour analyser tes sorties, demande à Claude : il lit ton Strava.</p></div>
-  <div class="sec">Paliers</div>
-  <div class="badges">${BADGES.filter(b => S.badges[b.id]).slice(-6).map(b => badgeHtml(b, true)).join('') || '<p class="tiny">Termine ta première séance pour débloquer ton premier palier.</p>'}</div>`;
+  <div class="sec">Mes derniers badges</div>
+  <div class="medals">${BADGES.filter(b => S.badges[b.id]).slice(-6).map(b => badgeHtml(b, true)).join('') || '<p class="tiny">Termine ta première séance pour débloquer ton premier badge.</p>'}</div>`;
 }
 
 const demoBlock = (id, q, label) => `<details data-mfor="${esc(id)}" ${S.guides[id] || metaOf(id).tip ? 'open' : ''}><summary>${label}</summary>
@@ -385,7 +368,7 @@ function finish() {
   const entry = { id: D.id, sid: D.sid, name: D.name, start: D.start, end: D.back ? D.start + Math.max(15 * 60e3, est) : Date.now(), tech: D.ex.filter(e => (e.tech || []).length).map(e => ({ id: e.id, t: e.tech })), note: (D.note || '').trim(), ex, prs, vol: ex.reduce((a, e) => a + e.sets.filter(s => s.t !== 'e').reduce((b, s) => b + s.kg * s.r, 0), 0) };
   const before = streak().n;
   S.log.push(entry); S.draft = null; refreshRec();
-  const fresh = checkBadges(); save(); releaseWake();
+  const chal = window.challengeCheck ? window.challengeCheck() : null; const fresh = checkBadges(); save(); releaseWake();
   const st = streak();
   go('home');
   const sets = ex.reduce((a, e) => a + e.sets.length, 0), mins = Math.max(1, Math.round((entry.end - entry.start) / 60000));
@@ -402,7 +385,7 @@ function finish() {
   requestAnimationFrame(() => { o.classList.add('show'); for (const el of o.querySelectorAll('[data-to]')) { const to = +el.dataset.to, t0 = performance.now(); const stp = n => { const k = Math.min(1, (n - t0) / 900), e2 = 1 - Math.pow(1 - k, 3); el.textContent = Math.round(to * e2).toLocaleString('fr-FR'); if (k < 1) requestAnimationFrame(stp); }; requestAnimationFrame(stp); } });
   o.addEventListener('click', ev => {
     const f = ev.target.closest('[data-feel]'); if (f) { entry.feel = f.dataset.feel; save(); for (const x of o.querySelectorAll('[data-feel]')) x.classList.toggle('sel', x === f); return; }
-    const a = ev.target.closest('[data-es]'); if (!a) return; o.classList.remove('show'); setTimeout(() => o.remove(), 300); if (a.dataset.es === 'journal') go('progress');
+    const a = ev.target.closest('[data-es]'); if (!a) return; o.classList.remove('show'); setTimeout(() => o.remove(), 300); if (a.dataset.es === 'journal') go('progress'); if (chal) setTimeout(() => window.showChallenge(chal), 350);
   });
 }
 
@@ -615,7 +598,8 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloaded) return; reloaded = true; if (!S.draft) location.reload(); else toast("Nouvelle version prête : elle s'appliquera à la prochaine ouverture"); });
 }
 
-window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos };
+window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid) };
+window.CARNET_fillMedia = fillMedia;
 if (!['home', 'workout', 'program', 'progress', 'tools', 'me'].includes(view)) view = 'home';
 window.applyTheme && window.applyTheme();
 checkBadges(); save(); render(); if (S.draft) wake();
