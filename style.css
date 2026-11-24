@@ -699,3 +699,12 @@ button.rmrow{all:unset;box-sizing:border-box;cursor:pointer;width:100%}
 .mtiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 @media(min-width:620px){.jgrid2{grid-template-columns:repeat(2,minmax(0,1fr))}.jgrid2 .weekcard,.jgrid2 .lastact{grid-column:span 1}.kt{grid-template-columns:repeat(4,minmax(0,1fr))}.mtiles{grid-template-columns:repeat(4,minmax(0,1fr))}.cgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.cols-a{height:180px}}
 @media(min-width:1100px){body[data-view=progress] #app{max-width:1100px}.jgrid2{grid-template-columns:repeat(3,minmax(0,1fr))}.jgrid2 .weekcard{grid-column:span 2}.cday{aspect-ratio:auto;min-height:74px}.cday .cico{display:block}.cday .cdots{display:none}}
+/* bouton central Journal mis en avant */
+#nav{align-items:end}
+#nav .navj{position:relative;overflow:visible}
+#nav .navj .nj-ic{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;margin-top:-26px;background:linear-gradient(145deg,var(--acc),color-mix(in srgb,var(--acc) 70%,#000));color:#fff;box-shadow:0 8px 20px -6px color-mix(in srgb,var(--acc) 70%,transparent),0 0 0 5px var(--bg);transition:transform .2s cubic-bezier(.2,.9,.3,1.4)}
+#nav .navj::before{display:none}
+#nav .navj .nj-t{font-size:12px;margin-top:2px}
+#nav .navj.sel{color:var(--acc-ink)}#nav .navj.sel .nj-ic{transform:translateY(-3px) scale(1.06)}
+#nav .navj:active .nj-ic{transform:scale(.92)}
+@media(min-width:1100px){#nav .navj .nj-ic{display:none}#nav .navj .nj-t{font-size:15px;margin:0}#nav .navj{background:color-mix(in srgb,var(--acc) 10%,transparent);color:var(--acc-ink)}#nav .navj.sel{background:var(--acc);color:#fff}}
