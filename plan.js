@@ -168,6 +168,7 @@ document.addEventListener('click', e => {
 const $ = s => document.querySelector(s);
 VIEWS.planNew = sid => newSheet(day0(Date.now()), sid);
 VIEWS.nextPlanned = () => { for (let k = 0; k < 14; k++) { const t = addD(day0(Date.now()), k), ps = plansOn(t).filter(p => !isDone(p, t)); if (ps.length) return { label: (k === 0 ? "Aujourd'hui" : k === 1 ? 'Demain' : fDay(t)) + ' · ' + (MOM[ps[0].moment] || '').toLowerCase(), name: planName(ps[0]) }; } return null; };
+VIEWS.plansAll = t => plansOn(day0(t));
 VIEWS.plansOn = t => { t = day0(t); return plansOn(t).filter(p => !isDone(p, t)).map(p => planName(p)); };
 VIEWS.plannedToday = () => { const t = day0(Date.now()); return plansOn(t).filter(p => !isDone(p, t)); };
 VIEWS.selectPlan = (pid, date) => { sel = { date, pid }; sub = 'cal'; };

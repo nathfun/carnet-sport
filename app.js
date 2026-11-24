@@ -118,33 +118,50 @@ function render() {
 const spotifyBtn = (cls = '') => S.set.spotify ? `<a class="btn ${cls}" href="${esc(S.set.spotify)}" target="_blank" rel="noopener">Musique Spotify</a>` : '';
 
 function vHome() {
-  const st = streak(), D = S.draft, todays = (window.VIEWS.plannedToday ? window.VIEWS.plannedToday() : []).filter(p => p.kind === 'muscu' && S.program.some(x => x.id === p.sid)), sug = todays.length ? S.program.find(x => x.id === todays[0].sid) : suggested(), m = weekCounts(), W = 7 * 864e5, now = monday(Date.now());
-  const weeks = Array.from({ length: 8 }, (_, i) => { const k = now - (7 - i) * W; return `<i class="${(m.get(k) || 0) >= S.set.goal ? 'on' : ''} ${k === now ? 'now' : ''}" title="${dateFr(k)}"></i>`; }).join('');
-  const run = RUNS[isoWeek(Date.now()) % 3], pogi = isoWeek(Date.now()) % 4 === 0;
-  return `
-  <div class="kicker">Mon espace</div><div class="between"><h1 class="hello">Bonjour <span class="wave">👋</span></h1><div class="row" style="gap:6px;flex-wrap:nowrap">${window.bellHtml ? window.bellHtml() : ''}<button class="sm ghost" data-act="settings">Réglages</button></div></div>
-  ${window.DELOAD && window.DELOAD.active() ? '<div class="dlcard on"><span>🧘</span><div><b>Semaine de décharge en cours</b><small>Charges à 60 %, une série en moins. Ton corps récupère et tu repars plus fort.</small></div><button class="sm" data-ex="deloadoff">Arrêter</button></div>' : window.DELOAD && window.DELOAD.due() ? '<div class="dlcard"><span>🧘</span><div><b>Semaine de décharge conseillée</b><small>Ça fait ' + window.DELOAD.cfg().every + ' semaines d\'affilée : une semaine plus légère pour mieux repartir.</small></div><button class="sm p" data-ex="deloadon">Activer</button></div>' : ''}
-  <div class="card streak">${FLAME.replace('class="flame"', `class="flame ${st.n || st.ok ? '' : 'off'}"`)}
-    <div><div class="num">${st.n} <span style="font-size:20px">semaine${st.n > 1 ? 's' : ''}</span></div>
-    <div class="small" style="color:#d8dae0">${st.ok ? 'Semaine validée, la flamme continue.' : `Cette semaine : ${st.thisWeek}/${S.set.goal} séance${S.set.goal > 1 ? 's' : ''} pour garder la flamme.`}</div>
-    <div class="weeks">${weeks}</div></div></div>
-  ${D ? `<div class="card next"><p class="tiny">Séance en cours</p><h2>${esc(D.name)}</h2><button class="p wide" style="margin-top:10px" data-act="goto" data-v="workout">Reprendre la séance</button></div>`
-      : `<div class="card next"><p class="tiny">${todays.length ? "Prévue aujourd'hui" : "Conseillée : c'est celle que tu as faite il y a le plus longtemps"}</p><h2>${esc(sug.name)}</h2><p class="mute small">${esc(sug.sub || '')}</p>
-      <div class="row" style="margin-top:10px"><button class="p grow" data-act="start" data-sid="${sug.id}">Commencer</button>${spotifyBtn('grow')}</div></div>`}
-  ${!S.set.spotify ? `<p class="tiny">Ajoute le lien de ta playlist dans Réglages pour avoir un bouton Spotify ici.</p>` : ''}
-  ${window.NUTRI ? (() => { const r = window.NUTRI.today(); return `<button class="card navcard nutcard" data-act="tool" data-k="nutri"><div style="flex:1"><div class="tiny">Ma nutrition du jour</div><h3>${r.p} / ${r.tp} g de protéines</h3><div class="ch-bar"><i style="width:${Math.min(100, r.p / r.tp * 100)}%;background:#2f6bff"></i></div><small class="tiny">${r.kcal.toLocaleString('fr-FR')} / ${r.tk.toLocaleString('fr-FR')} kcal</small></div><span class="pill">Noter</span></button>`; })() : ''}
-  <div class="toolrow"><button data-act="tool" data-k="cm"><b>Charge max</b><small>1RM et charges</small></button><button data-act="tool" data-k="cal"><b>Calories</b><small>Besoins et repas</small></button><button data-act="tool" data-k="al"><b>Allures</b><small>Course à pied</small></button></div>
-  <div class="sec">Choisir une autre séance</div>
-  <div class="card">${S.program.map(s => { const l = lastDone(s.id); return `<div class="sess"><div><h3>${esc(s.name)}</h3><div class="tiny">${s.ex.length} exercices · ${l ? 'dernière fois ' + dateFr(l) : 'jamais faite'}</div></div><button class="sm" data-act="start" data-sid="${s.id}" ${D ? 'disabled' : ''}>Lancer</button></div>`; }).join('')}
-    <div class="sess"><div><h3>Séance libre</h3><div class="tiny">Tu ajoutes les exercices au fur et à mesure</div></div><button class="sm" data-act="start" data-sid="" ${D ? 'disabled' : ''}>Lancer</button></div></div>
-  <div class="sec">Cardio de la semaine (suivi dans Strava)</div>
-  <div class="card"><h3>Course : ${esc(run.t)}</h3><p class="small mute">${esc(run.d)}. Échauffement 15 min, retour au calme 10 min.</p>
-    <h3 style="margin-top:12px">Vélo : ${pogi ? 'sortie « Pogačar » 60 km' : 'endurance 50–70 km'}</h3><p class="small mute">${pogi ? '4 à 5 efforts de 5 min en côte, récup 3–4 min.' : 'Zone 2 : tu dois pouvoir parler. Cadence 85–95.'}</p>
-    <a class="btn wide" style="margin-top:8px" href="https://www.strava.com/dashboard" target="_blank" rel="noopener">Ouvrir Strava</a>
-    <p class="tiny" style="margin-top:8px">Pour analyser tes sorties, demande à Claude : il lit ton Strava.</p></div>
-  <div class="sec">Mes derniers badges</div>
-  <div class="medals">${BADGES.filter(b => S.badges[b.id]).slice(-6).map(b => badgeHtml(b, true)).join('') || '<p class="tiny">Termine ta première séance pour débloquer ton premier badge.</p>'}</div>`;
+  const st = streak(), D = S.draft, now = Date.now(), d0 = new Date(); d0.setHours(0, 0, 0, 0); const t0 = d0.getTime();
+  const V = window.VIEWS || {}, plansT = (V.plansAll ? V.plansAll(t0) : []), doneT = S.log.filter(l => l.start >= t0);
+  const todo = (V.plannedToday ? V.plannedToday() : []);
+  const nm = p => p.kind === 'muscu' ? (S.program.find(x => x.id === p.sid) || {}).name || 'Séance' : p.name || (p.kind === 'run' ? 'Course' : 'Vélo');
+  const est = s => { let sec = 0; for (const e of s.ex) sec += (+e.sets || 0) * (45 + (+e.rest || 60)); return Math.round(sec / 60); };
+  const kindOf = l => l.kind === 'run' ? 'run' : l.kind === 'bike' ? 'bike' : 'gym', ICO = { gym: '🏋️', run: '🏃', bike: '🚴', muscu: '🏋️' };
+  const mm = s => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+  // course : où en est-on ?
+  const runs = S.log.filter(l => l.kind === 'run' && l.km >= 3).sort((a, b) => a.start - b.start), last5 = runs.slice(-5);
+  const P = last5.length ? last5.reduce((a, l) => a + (l.pace || l.sec / l.km), 0) / last5.length : 0, lastRun = runs.at(-1);
+  const week7 = runs.filter(l => l.start > now - 7 * 864e5), quality = week7.some(l => (l.pace || l.sec / l.km) < Math.min(P - 12, 300) || /fraction|interv|tempo|seuil|vma/i.test(l.name));
+  const hSince = lastRun ? (now - lastRun.start) / 36e5 : 999;
+  const runAdv = !runs.length ? { t: 'Première sortie', d: '30 min tranquille, en aisance respiratoire (tu peux parler).', why: 'Pour poser une base.' }
+    : hSince < 30 ? { t: 'Récupération', d: 'Pas de course aujourd\'hui, ou 25 min très lent (6:30/km et plus).', why: `Tu as couru il y a ${Math.round(hSince)} h : laisse tes jambes récupérer.` }
+    : !week7.length ? { t: 'Reprise en endurance', d: '35–40 min à 5:50–6:20/km, FC en zone 2 (131–162 bpm).', why: 'Aucune course depuis 7 jours.' }
+    : !quality ? { t: RUNS[isoWeek(now) % 3].t, d: RUNS[isoWeek(now) % 3].d + '. Échauffement 15 min, retour au calme 10 min.', why: 'Que de l\'endurance cette semaine : c\'est le fractionné qui te rapproche de 4:30.' }
+    : { t: 'Sortie longue tranquille', d: '10–12 km à 5:45–6:15/km, en zone 2.', why: 'Tu as déjà fait ta séance rapide : place au volume.' };
+  // semaine
+  const w0 = monday(now), W = S.log.filter(l => l.start >= w0), weekPlans = Array.from({ length: 7 }, (_, i) => V.plansAll ? V.plansAll(w0 + i * 864e5) : []).flat();
+  const goals = { gym: S.set.goal, run: Math.max(1, weekPlans.filter(p => p.kind === 'run').length), bike: Math.max(1, weekPlans.filter(p => p.kind === 'bike').length) };
+  const got = { gym: W.filter(l => kindOf(l) === 'gym').length, run: W.filter(l => l.kind === 'run').length, bike: W.filter(l => l.kind === 'bike').length };
+  const km = { run: W.filter(l => l.kind === 'run').reduce((a, l) => a + l.km, 0), bike: W.filter(l => l.kind === 'bike').reduce((a, l) => a + l.km, 0) };
+  // aujourd'hui
+  const first = D ? null : todo[0], tpl = first && first.kind === 'muscu' && S.program.find(x => x.id === first.sid), sug = suggested();
+  let today;
+  if (D) today = `<div class="today live"><div class="eyebrow">Séance en cours</div><h2>${esc(D.name)}</h2><p class="small mute">${D.ex.filter(e => e.sets.every(s => s.ok)).length}/${D.ex.length} exercices faits</p><button class="p wide" data-act="goto" data-v="workout">Reprendre la séance</button></div>`;
+  else if (tpl) { const ms = [...new Set(tpl.ex.map(e => metaOf(e.id).m).filter(Boolean))]; today = `<div class="today"><div class="eyebrow">Aujourd'hui · ${esc(({ matin: 'matin', midi: 'midi', apm: 'après-midi', soir: 'soir' })[first.moment] || '')}</div><div class="td-h"><div>${window.bodySvg(ms.length ? ms : ['Pecs'], { cls: 'td-body' })}</div><div><h2>${esc(tpl.name)}</h2><p class="small mute">${tpl.ex.length} exercices · ≈ ${est(tpl)} min</p><div class="chipsrow">${ms.slice(0, 4).map(m => `<span class="chip2">${esc(m)}</span>`).join('')}</div></div></div><div class="row"><button class="p grow" data-act="start" data-sid="${tpl.id}">Commencer</button>${spotifyBtn('grow')}</div><button class="link" data-act="goto" data-v="program" style="margin-top:8px">Faire une autre séance</button></div>`; }
+  else if (first && first.kind === 'run') today = `<div class="today run"><div class="eyebrow">Aujourd'hui · course</div><h2>🏃 ${esc(runAdv.t)}</h2><p>${esc(runAdv.d)}</p><p class="tiny">${esc(runAdv.why)}</p><p class="tiny">Lance l'enregistrement sur Strava : la sortie arrivera toute seule ici.</p></div>`;
+  else if (first && first.kind === 'bike') today = `<div class="today bike"><div class="eyebrow">Aujourd'hui · vélo</div><h2>🚴 ${isoWeek(now) % 4 === 0 ? 'Sortie « Pogačar » 60 km' : 'Endurance 50–70 km'}</h2><p>${isoWeek(now) % 4 === 0 ? '4 à 5 efforts de 5 min en côte, récup 3–4 min.' : 'Zone 2, régulier, mange toutes les 45 min.'}</p></div>`;
+  else if (doneT.length) today = `<div class="today done"><div class="eyebrow">Aujourd'hui</div><h2>Bien joué ✓</h2>${doneT.map(l => `<button class="arow" data-lib="ana" data-id="${esc(l.id)}"><span class="a-ic" style="--c:var(--acc)">${ICO[kindOf(l)]}</span><span class="a-t"><b>${esc(l.name)}</b><small>${l.km ? (l.km.toFixed ? l.km.toFixed(1).replace('.', ',') : l.km) + ' km' : (l.vol || 0) + ' kg'}</small></span><span class="mer-go">›</span></button>`).join('')}<p class="tiny">Pense à bien manger et à dormir : c'est là que tu progresses.</p></div>`;
+  else today = `<div class="today rest"><div class="eyebrow">Aujourd'hui</div><h2>Jour de repos 😌</h2><p class="small mute">Rien de prévu. Envie de bouger quand même ?</p><div class="row"><button class="grow" data-act="start" data-sid="${sug.id}">${esc(sug.name)}</button><button class="grow" data-act="goto" data-v="program">Planifier</button></div></div>`;
+  const wk8 = Array.from({ length: 8 }, (_, i) => { const k = monday(now) - (7 - i) * 7 * 864e5; return `<i class="${(weekCounts().get(k) || 0) >= S.set.goal ? 'on' : ''} ${k === monday(now) ? 'now' : ''}"></i>`; }).join('');
+  const recent = S.log.filter(l => l.start > now - 7 * 864e5 && (l.prs || []).length).at(-1), badge = BADGES.filter(b => S.badges[b.id] && S.badges[b.id] > now - 7 * 864e5).at(-1);
+  return `<div class="kicker">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div><div class="between"><h1 class="hello">Bonjour <span class="wave">👋</span></h1><div class="row" style="gap:6px;flex-wrap:nowrap">${window.bellHtml ? window.bellHtml() : ''}<button class="sm" data-act="settings">Réglages</button></div></div>
+  ${window.DELOAD && window.DELOAD.active() ? '<div class="dlcard on"><span>🧘</span><div><b>Semaine de décharge en cours</b><small>Charges à 60 %, une série en moins. Ton corps récupère et tu reviens plus fort.</small></div><button class="sm" data-ex="deloadoff">Terminer</button></div>' : window.DELOAD && window.DELOAD.due() ? '<div class="dlcard"><span>🧘</span><div><b>Semaine de décharge conseillée</b><small>Ça fait plusieurs semaines que tu pousses : une semaine plus légère évite blessure et stagnation.</small></div><button class="sm" data-ex="deloadon">Activer</button></div>' : ''}
+  ${today}
+  <section class="card hweek"><div class="hw-top">${FLAME.replace('class="flame"', `class="flame ${st.n || st.ok ? '' : 'off'}"`)}<div><b>${st.n} semaine${st.n > 1 ? 's' : ''} de suite</b><small>${st.ok ? 'Semaine validée, la flamme continue.' : `Encore ${S.set.goal - st.thisWeek} séance${S.set.goal - st.thisWeek > 1 ? 's' : ''} de muscu cette semaine pour la garder.`}</small><div class="weeks">${wk8}</div></div></div>
+    <div class="hw-g">${[['gym', '🏋️', 'Muscu', got.gym + '/' + goals.gym, got.gym / goals.gym], ['run', '🏃', 'Course', fr1(km.run) + ' km', got.run / goals.run], ['bike', '🚴', 'Vélo', Math.round(km.bike) + ' km', got.bike / goals.bike]].map(([k, i, l, v, p]) => `<div class="hw-${k}"><span>${i} ${l}</span><b>${v}</b><i><em style="width:${Math.min(100, p * 100)}%"></em></i></div>`).join('')}</div></section>
+  ${runs.length ? `<section class="card hrun"><div class="between"><div class="eyebrow" style="margin:0">Prochaine course conseillée</div><span class="${P <= 270 ? 'okchip' : 'chip2'}">${P <= 270 ? '4:30 atteint' : mm(P) + '/km · +' + Math.round(P - 270) + ' s'}</span></div><h3>${esc(runAdv.t)}</h3><p class="small">${esc(runAdv.d)}</p><p class="tiny">${esc(runAdv.why)}${lastRun ? ` Dernière course : ${fr1(lastRun.km)} km à ${mm(lastRun.pace || lastRun.sec / lastRun.km)}/km, ${dateFr(lastRun.start).toLowerCase().replace(/\.$/, '')}.` : ''}</p></section>` : ''}
+  ${window.NUTRI ? (() => { const r = window.NUTRI.today(); return `<button class="card navcard nutcard" data-act="tool" data-k="nutri"><div style="flex:1"><div class="tiny">${doneT.some(l => kindOf(l) === 'gym') ? 'Après ta séance : vise les protéines' : 'Ma nutrition du jour'}</div><h3>${Math.round(r.p)} / ${r.tp} g de protéines</h3><div class="ch-bar"><i style="width:${Math.min(100, r.p / r.tp * 100)}%"></i></div><div class="tiny" style="margin-top:6px">${Math.round(r.kcal)} / ${r.tk} kcal</div></div><span class="sm btn">Noter</span></button>`; })() : ''}
+  ${recent || badge ? `<section class="card hwin">${badge ? `<div class="hwin-m">${badgeHtml(badge, true)}</div>` : '<span class="hwin-i">🏆</span>'}<div><div class="eyebrow">Cette semaine</div><b>${recent ? 'Nouveau record : ' + esc(recent.prs[0]) : 'Badge débloqué : ' + esc(badge.n)}</b><small>${badge && recent ? 'Et le badge « ' + esc(badge.n) + ' » !' : ''}</small></div></section>` : ''}
+  ${!S.set.spotify ? `<p class="tiny" style="text-align:center;margin-top:14px">Astuce : ajoute ta playlist Spotify dans Réglages pour la lancer d'ici.</p>` : ''}`;
 }
+const fr1 = v => (Math.round(v * 10) / 10).toLocaleString('fr-FR');
 
 const demoBlock = (id, q, label) => `<details data-mfor="${esc(id)}" ${S.guides[id] || metaOf(id).tip ? 'open' : ''}><summary>${label}</summary>
   ${S.guides[id] ? `<p class="small" style="white-space:pre-wrap">${esc(S.guides[id])}</p>` : metaOf(id).tip ? `<p class="small mute">Conseil : ${esc(metaOf(id).tip)}</p>` : ''}
@@ -492,7 +509,7 @@ function settingsInner() {
   <div class="sec">Semaine de décharge</div><p class="tiny">Une semaine plus légère conseillée toutes les :</p>
   <div class="pills">${[6, 7, 8].map(n => `<button class="${(window.DELOAD ? window.DELOAD.cfg().every : 7) === n ? 'sel' : ''}" data-ex="deloadevery" data-v="${n}">${n} semaines</button>`).join('')}</div>
   ${window.SYNC ? window.SYNC.html() : ''}
-  <div class="sec">Version</div><p class="tiny">Version 20 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
+  <div class="sec">Version</div><p class="tiny">Version 22 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
   <div class="sec">Sauvegarde</div>
   <p class="tiny">Copie de secours manuelle, utile si la synchro n'est pas activée. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
