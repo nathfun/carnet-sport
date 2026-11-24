@@ -124,3 +124,22 @@ details summary{cursor:pointer;font-weight:600;padding:8px 0;color:var(--mute);f
 .chips button{text-align:left;justify-content:flex-start;padding:8px 14px}
 .pdemo{grid-column:1/-1}.pdemo details{background:var(--card2);border-radius:12px;padding:2px 12px 10px}.pdemo summary{font-size:14px}
 [hidden]{display:none!important}
+.seg{display:flex;gap:4px;background:var(--card2);border-radius:13px;padding:4px}
+.seg button{flex:1;min-height:38px;border:0;background:transparent;font-size:14px;padding:0 6px;border-radius:10px}
+.seg button.sel{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.chips button.sel{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.scrollx{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.scrollx button{flex:none}
+.stype{padding:0;min-height:40px;font-weight:800;font-size:16px;border-radius:10px;background:transparent;border-color:transparent}
+.stype.t-e{background:#f5c33b;color:#14161b}.stype.t-d{background:#5b7cfa;color:#fff}.stype.t-f{background:var(--acc);color:#fff}
+.set{grid-template-columns:40px minmax(0,1fr) minmax(0,1fr) 58px}
+.set.isPr .ck{background:linear-gradient(135deg,#ff7a1a,#e0262e);border-color:#e0262e}
+.prhint{background:var(--card2);border-radius:12px;padding:10px 12px;font-size:15px;margin:0 0 10px}
+.ex.ss{border-left:5px solid #5b7cfa}.sstag{font-size:12px;font-weight:800;color:#5b7cfa;margin-bottom:2px}
+details.rec{padding:12px 16px}details.rec summary{list-style:none;color:var(--ink);padding:0}details.rec summary::-webkit-details-marker{display:none}
+.rec .big{font-size:28px;white-space:nowrap}.rec .big small{font-size:14px;font-weight:600;color:var(--mute)}
+.mbar{display:grid;grid-template-columns:92px minmax(0,1fr) 32px;gap:8px;align-items:center;margin:8px 0;font-size:14px}
+.mbar>div{position:relative;height:14px;background:var(--card2);border-radius:7px;overflow:hidden}
+.mbar i{position:absolute;inset:0 auto 0 0;background:var(--acc);border-radius:7px}
+.mbar em{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);opacity:.35}
+.mbar b{text-align:right}
+@media (max-width:380px){.set{grid-template-columns:36px minmax(0,1fr) minmax(0,1fr) 52px}}
