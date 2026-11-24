@@ -37,6 +37,9 @@ let S = null;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { }
 if (!S || !Array.isArray(S.program)) S = { progV: 2, program: [...defaultProgram(), prSession()], lib: [], log: [], draft: null, badges: {}, set: { spotify: '', goal: 1, exRest: 180 } };
 S.set = { spotify: '', goal: 1, exRest: 180, ...S.set }; S.lib = S.lib || []; S.badges = S.badges || {}; S.guides = S.guides || {};
+S.set.theme = S.set.theme || 'chrono';
+if (!S.body) S.body = { h: (S.cal && S.cal.h) || 176, birth: new Date().getFullYear() - ((S.cal && S.cal.age) || 20), weights: [{ t: Date.now(), kg: (S.cal && S.cal.w) || 67 }], meas: [] };
+const body = () => { const ws = S.body.weights || []; return { h: S.body.h || 176, age: new Date().getFullYear() - (S.body.birth || 2006), w: ws.length ? ws[ws.length - 1].kg : 67 }; };
 for (const e of SPARE) if (!S.lib.some(x => x.id === e.id)) S.lib.push(e);
 if (!S.program.some(p => p.id === 'prday')) S.program.push(prSession());
 if ((S.progV || 1) < 2) { const d = defaultProgram(); for (const id of ['pecsA', 'pecsB', 'dosA']) { const i = S.program.findIndex(p => p.id === id), n = d.find(p => p.id === id); if (i >= 0) S.program[i] = n; } S.progV = 2; }
@@ -116,7 +119,10 @@ const app = $('#app');
 function go(v) { view = v; render(); window.scrollTo(0, 0); }
 function render() {
   for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('sel', b.dataset.view === view);
-  app.innerHTML = ({ home: vHome, workout: vWorkout, program: () => progSub === 'exos' ? subTabs() + vExos() : subTabs() + vProgram(), progress: vProgress, coach: vCoach }[view] || vHome)();
+  const V = window.VIEWS || {};
+  app.innerHTML = ({ home: vHome, workout: vWorkout, program: () => progSub === 'exos' ? subTabs() + vExos() : subTabs() + vProgram(), progress: vProgress, tools: V.tools, me: V.me }[view] || vHome)();
+  document.body.dataset.view = view;
+  const A = (window.AFTER || {})[view]; if (A) try { A(); } catch (e) { console.error(e); }
   if (view === 'workout' && S.draft) { const c = S.draft.ex[S.draft.cur]; if (c) fillMedia(c.id); }
   if (view === 'progress') drawChart();
   tick();
@@ -128,7 +134,7 @@ function vHome() {
   const weeks = Array.from({ length: 8 }, (_, i) => { const k = now - (7 - i) * W; return `<i class="${(m.get(k) || 0) >= S.set.goal ? 'on' : ''} ${k === now ? 'now' : ''}" title="${dateFr(k)}"></i>`; }).join('');
   const run = RUNS[isoWeek(Date.now()) % 3], pogi = isoWeek(Date.now()) % 4 === 0;
   return `
-  <div class="between"><h1>Salut Nathan</h1><button class="sm ghost" data-act="settings">Réglages</button></div>
+  <div class="kicker">Mon espace</div><div class="between"><h1 class="hello">Bonjour <span class="wave">👋</span></h1><button class="sm ghost" data-act="settings">Réglages</button></div>
   <div class="card streak">${FLAME.replace('class="flame"', `class="flame ${st.n || st.ok ? '' : 'off'}"`)}
     <div><div class="num">${st.n} <span style="font-size:20px">semaine${st.n > 1 ? 's' : ''}</span></div>
     <div class="small" style="color:#d8dae0">${st.ok ? 'Semaine validée, la flamme continue.' : `Cette semaine : ${st.thisWeek}/${S.set.goal} séance${S.set.goal > 1 ? 's' : ''} pour garder la flamme.`}</div>
@@ -137,7 +143,8 @@ function vHome() {
       : `<div class="card next"><p class="tiny">Conseillée : c'est celle que tu as faite il y a le plus longtemps</p><h2>${esc(sug.name)}</h2><p class="mute small">${esc(sug.sub || '')}</p>
       <div class="row" style="margin-top:10px"><button class="p grow" data-act="start" data-sid="${sug.id}">Commencer</button>${spotifyBtn('grow')}</div></div>`}
   ${!S.set.spotify ? `<p class="tiny">Ajoute le lien de ta playlist dans Réglages pour avoir un bouton Spotify ici.</p>` : ''}
-  ${S.cal ? (() => { const r = calc(S.cal); return `<div class="card"><div class="between"><div><div class="tiny">Objectif nutrition (${{ recompo: 'recompo', prise: 'prise de muscle', seche: 'sèche' }[S.cal.goal]})</div><h3>${r.avg} kcal · ${r.p} g de protéines</h3></div><button class="sm" data-act="goto" data-v="coach" onclick="">Voir</button></div></div>`; })() : ''}
+  ${window.calSummary ? (() => { const r = window.calSummary(); return `<button class="card navcard" data-act="tool" data-k="cal"><div><div class="tiny">Objectif nutrition du jour</div><h3>${r.kcal.toLocaleString('fr-FR')} kcal · ${r.p} g de protéines</h3></div><span class="pill">Voir</span></button>`; })() : ''}
+  <div class="toolrow"><button data-act="tool" data-k="cm"><b>Charge max</b><small>1RM et charges</small></button><button data-act="tool" data-k="cal"><b>Calories</b><small>Besoins et repas</small></button><button data-act="tool" data-k="al"><b>Allures</b><small>Course à pied</small></button></div>
   <div class="sec">Choisir une autre séance</div>
   <div class="card">${S.program.map(s => { const l = lastDone(s.id); return `<div class="sess"><div><h3>${esc(s.name)}</h3><div class="tiny">${s.ex.length} exercices · ${l ? 'dernière fois ' + dateFr(l) : 'jamais faite'}</div></div><button class="sm" data-act="start" data-sid="${s.id}" ${D ? 'disabled' : ''}>Lancer</button></div>`; }).join('')}
     <div class="sess"><div><h3>Séance libre</h3><div class="tiny">Tu ajoutes les exercices au fur et à mesure</div></div><button class="sm" data-act="start" data-sid="" ${D ? 'disabled' : ''}>Lancer</button></div></div>
@@ -313,6 +320,16 @@ function vCalories() {
     <h3 style="margin-top:14px">Ta semaine de sport</h3><div class="trio" style="margin-top:6px">${f('muscu', 'Muscu', '/sem')}${f('dur', 'Durée', 'min')}${f('run', 'Course', 'km')}</div><div class="trio">${f('bike', 'Vélo', 'km')}</div>
     <p class="tiny" style="margin-top:10px">Métabolisme de base ${r.bmr} kcal (formule de Mifflin-St Jeor), vie d'étudiant ×1,4, plus ${r.week} kcal de sport par semaine. C'est une estimation à ±10 % : pèse-toi 3 matins par semaine et regarde la moyenne. Si elle bouge de plus de 0,5 kg en 3 semaines alors que tu vises la recompo, ajuste de 150 kcal.</p></div>`;
 }
+function vCoachClaude() {
+  const on = navigator.onLine;
+  return `<p class="mute small">Ta question part chez Claude avec tes dernières séances et ton programme. Tu n'as rien à réexpliquer.</p>
+  ${on ? '' : '<p class="offline">Pas de réseau en ce moment. Écris ta question, elle reste prête pour quand tu en retrouves.</p>'}
+  <div class="card"><div class="chips">${QUICK.map((q, i) => `<button data-act="quick" data-i="${i}">${esc(q)}</button>`).join('')}</div>
+    <label style="margin-top:12px">Ta question<textarea rows="3" id="cq" data-f="coachq">${esc(S.coachQ || '')}</textarea></label>
+    <button class="p wide" style="margin-top:10px" data-act="ask" ${on ? '' : 'disabled'}>Demander à Claude</button>
+    <button class="wide" style="margin-top:8px" data-act="copyctx">Copier mon résumé</button>
+    <p class="tiny" style="margin-top:8px">Le bouton ouvre Claude avec ta question déjà écrite. Pour une analyse de tes sorties course et vélo, Claude peut aussi lire ton Strava.</p></div>`;
+}
 function vCoach() {
   const on = navigator.onLine;
   const tabs = `<h1>Coach</h1><div class="seg" style="margin:12px 0">${[['claude', 'Demander à Claude'], ['cal', 'Calories']].map(([k, l]) => `<button class="${coachSub === k ? 'sel' : ''}" data-act="csub" data-k="${k}">${l}</button>`).join('')}</div>`;
@@ -418,8 +435,10 @@ function addExercise(e, target, si, keep) {
   if (keep) { const p = S.program.find(p => p.id === D.sid); if (p && !p.ex.some(x => x.id === e.id)) p.ex.push({ ...e }); }
   save(); closeSheet(); render(); toast('Exercice ajouté');
 }
-function settingsSheet() {
-  sheet(`<h2>Réglages</h2>
+function settingsHtml() { return settingsInner().replace('<button class="ghost wide" style="margin-top:8px" data-close>Fermer</button>', ''); }
+function settingsSheet() { go('me'); window.VIEWS.meGoto('reglages'); render(); }
+function settingsInner() {
+  return (`<div class="tcard">
   <label style="margin-top:12px">Lien de ta playlist Spotify<input id="spurl" value="${esc(S.set.spotify)}" placeholder="https://open.spotify.com/playlist/…" inputmode="url"></label>
   <p class="tiny">Dans Spotify : ta playlist, ⋯, Partager, Copier le lien.</p>
   <label style="margin-top:10px">Séances par semaine pour garder la flamme<select id="goal">${[1, 2, 3, 4, 5, 6].map(n => `<option ${n === S.set.goal ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
@@ -429,7 +448,7 @@ function settingsSheet() {
   <p class="tiny">Tout est enregistré sur cet appareil (téléphone ou ordi), sans synchro automatique. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
   <div class="row"><button class="grow" data-act="export">Exporter mes données</button><label class="btn grow">Importer<input type="file" accept="application/json,.json" hidden id="impf"></label></div>
-  <button class="ghost wide" style="margin-top:8px" data-close>Fermer</button>`);
+  <button class="ghost wide" style="margin-top:8px" data-close>Fermer</button></div>`);
 }
 
 /* ---------- toast ---------- */
@@ -448,6 +467,7 @@ document.addEventListener('click', async ev => {
   const a = b.dataset.act, D = S.draft, cur = D && D.ex[D.cur];
   switch (a) {
     case 'goto': go(b.dataset.v); break;
+    case 'tool': window.VIEWS.toolsGoto(b.dataset.k); go('tools'); break;
     case 'settings': settingsSheet(); break;
     case 'start': if (!S.draft) start(b.dataset.sid); break;
     case 'pick': { const i = +b.dataset.i; D.cur = i; D.rest = null; if (D.ex[i].state !== 'todo') D.ex[i].state = 'todo'; save(); render(); const el = document.querySelectorAll('.ex')[i]; el && el.scrollIntoView({ block: 'start', behavior: 'smooth' }); break; }
@@ -503,7 +523,7 @@ document.addEventListener('click', async ev => {
     case 'quick': { const q = QUICK[+b.dataset.i]; S.coachQ = q; $('#cq').value = q; save(); break; }
     case 'ask': { const q = ($('#cq').value || '').trim() || QUICK[0]; const p = coachPrompt(q); try { await navigator.clipboard.writeText(p); } catch (e) { } const l = document.createElement('a'); l.href = 'https://claude.ai/new?q=' + encodeURIComponent(p.slice(0, 6000)); l.target = '_blank'; l.rel = 'noopener'; document.body.appendChild(l); l.click(); l.remove(); break; }
     case 'copyctx': { const p = coachPrompt(($('#cq').value || '').trim() || '(écris ta question ici)'); try { await navigator.clipboard.writeText(p); toast('Résumé copié : colle-le dans Claude'); } catch (e) { sheet(`<h2>Ton résumé</h2><p class="tiny">Sélectionne le texte et copie-le.</p><textarea rows="12" readonly>${esc(p)}</textarea><button class="wide" style="margin-top:8px" data-close>Fermer</button>`); } break; }
-    case 'saveset': { const v = $('#spurl').value.trim(); if (v && !/^https:\/\/(open\.)?spotify\.com\//.test(v) && !/^https:\/\/spotify\.link\//.test(v)) { toast('Colle un lien Spotify (https://open.spotify.com/…)'); break; } S.set.spotify = v; S.set.goal = +$('#goal').value; S.set.exRest = +$('#exrest').value; save(); closeSheet(); render(); toast('Réglages enregistrés'); break; }
+    case 'saveset': { const v = $('#spurl').value.trim(); if (v && !/^https:\/\/(open\.)?spotify\.com\//.test(v) && !/^https:\/\/spotify\.link\//.test(v)) { toast('Colle un lien Spotify (https://open.spotify.com/…)'); break; } S.set.spotify = v; S.set.goal = +$('#goal').value; S.set.exRest = +$('#exrest').value; save(); render(); toast('Réglages enregistrés'); break; }
     case 'export': { b.disabled = true; b.textContent = 'Préparation…'; const withMedia = $('#expmedia')?.checked; let media = [];
       if (withMedia) { await idbReady; media = await new Promise(res => { if (!idb) return res([]); const q = idb.transaction('media').objectStore('media').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); media = await Promise.all(media.map(m => new Promise(r => { const fr = new FileReader(); fr.onload = () => r({ ex: m.ex, type: m.type, size: m.blob.size, data: fr.result }); fr.onerror = () => r(null); fr.readAsDataURL(m.blob); }))); media = media.filter(Boolean); }
       const blob = new Blob([JSON.stringify({ app: 'carnet-sport', v: 2, at: Date.now(), program: S.program, lib: S.lib, log: S.log, badges: S.badges, best: S.best, set: S.set, guides: S.guides, cal: S.cal, media })], { type: 'application/json' });
@@ -544,5 +564,8 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloaded) return; reloaded = true; if (!S.draft) location.reload(); else toast("Nouvelle version prête : elle s'appliquera à la prochaine ouverture"); });
 }
 
+window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml };
+if (!['home', 'workout', 'program', 'progress', 'tools', 'me'].includes(view)) view = 'home';
+window.applyTheme && window.applyTheme();
 checkBadges(); save(); render(); if (S.draft) wake();
 }
