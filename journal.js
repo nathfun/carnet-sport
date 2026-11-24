@@ -241,7 +241,7 @@ function vBadges() {
   ${fams.map(f => `<h2 class="h2t" style="font-size:20px">${f}</h2><div class="medals">${window.BADGES2.filter(b => b.f === f).map(b => { const on = !!S.badges[b.id]; return `<button class="mbtn" data-jr="badge" data-v="${b.id}">${window.medal(b, on)}${on ? '' : `<span class="mprog"><i style="width:${b.prog(st) * 100}%"></i></span>`}</button>`; }).join('')}</div>`).join('')}`;
 }
 VIEWS.journal = () => {
-  const tabs = [['resume', 'Résumé'], ['exos', 'Exercices'], ['cal', 'Calendrier'], ['chiffres', 'Chiffres'], ['badges', 'Badges']];
+  const tabs = [['resume', 'Résumé'], ['amis', 'Amis'], ['exos', 'Exercices'], ['cal', 'Calendrier'], ['chiffres', 'Chiffres'], ['badges', 'Badges']];
   const body = { resume: vResume, exos: vExos, cal: vCal, chiffres: vChiffres, badges: vBadges }[tab]();
   return `<div class="kicker">Mon espace</div><h1>Journal</h1><div class="seg scrollseg" style="margin:12px 0">${tabs.map(([k, l]) => `<button class="${tab === k ? 'sel' : ''}" data-jr="tab" data-v="${k}">${l}</button>`).join('')}</div>${body}`;
 };
@@ -270,7 +270,7 @@ async function story(l) {
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-jr]'); if (!b || !window.CARNET) return; const v = b.dataset.v;
   switch (b.dataset.jr) {
-    case 'tab': tab = v; exOpen = null; C().go('progress'); return;
+    case 'tab': if (v === 'amis') { C().go('social'); return; } tab = v; exOpen = null; C().go('progress'); return;
     case 'detail': if (window.DESK) { window.DESK.openAna(v, 'progress'); return; } sessionSheet(v); return;
     case 'day': selDay = v; break;
     case 'sport': sport = v; break;

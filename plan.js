@@ -75,7 +75,7 @@ function vMonth() {
   <div class="sec">${fDay(selD)}</div>${dayBlock(selD)}`;
 }
 VIEWS.seances = () => {
-  const tabs = `<div class="kicker">Entraînement</div><div class="between"><h1>Mes séances</h1><button class="p sm" data-pl="new" data-d="${day0(Date.now())}">+ Séance</button></div><div class="seg" style="margin:12px 0">${[['cal', 'Calendrier'], ['modeles', 'Mes modèles'], ['exos', 'Exercices']].map(([k, l]) => `<button class="${sub === k ? 'sel' : ''}" data-pl="sub" data-v="${k}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="kicker">Entraînement</div><div class="between"><h1>Mes séances</h1><button class="p sm" data-pl="new" data-d="${day0(Date.now())}">+ Séance</button></div><button class="genbtn" data-gn="start"><span>✨</span><span><b>Programme personnalisé</b><small>Réponds à quelques questions : l'app crée ton programme de muscu, course ou vélo</small></span><span class="mer-go">›</span></button><div class="seg" style="margin:12px 0">${[['cal', 'Calendrier'], ['modeles', 'Mes modèles'], ['exos', 'Exercices']].map(([k, l]) => `<button class="${sub === k ? 'sel' : ''}" data-pl="sub" data-v="${k}">${l}</button>`).join('')}</div>`;
   if (sub === 'modeles') return tabs + VIEWS.models();
   if (sub === 'exos') { setTimeout(() => window.AFTER.lib && window.AFTER.lib(), 0); return tabs + window.VIEWS.lib(); }
   return tabs + seg2() + (mode === 'semaine' ? vWeek() : vMonth()) + `<div id="sdet">${detail()}</div>`;

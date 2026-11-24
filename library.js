@@ -245,6 +245,6 @@ sledpush|Poussée de traîneau|Cardio|M|d|Bras tendus, petits pas rapides, corps
 corde|Corde à sauter|Cardio|C|d|Petits sauts sur l'avant des pieds, poignets qui tournent.
 burpees|Burpees|Cardio|C|d|Squat, planche, pompe, saut : à ton rythme.
 wallball|Wall balls|Cardio|C|d|Squat puis lance le médecine-ball sur la cible au mur.
-`.trim().split('\n').map(l => { const [id, n, m, eq, k, tip] = l.split('|'); const d = { s: [4, '6-8', 150], c: [3, '8-10', 120], i: [3, '12-15', 60], a: [3, '15', 45], d: [1, '10-20 min', 60] }[k]; return { id, n, m, eq, sets: d[0], reps: d[1], rest: d[2], tip: tip || '', q: n.replace(/\(.*?\)/g, '') + ' technique' }; });
+`.trim().split('\n').map(l => { const [id, n, m, eq, k, tip] = l.split('|'); const d = { s: [4, '6-8', 150], c: [3, '8-10', 120], i: [3, '12-15', 60], a: [3, '15', 45], d: [1, '10-20 min', 60] }[k]; return { id, n, m, eq, k, sets: d[0], reps: d[1], rest: d[2], tip: tip || '', q: n.replace(/\(.*?\)/g, '') + ' technique' }; });
 window.EQUIP = { M: 'Machine', S: 'Smith', P: 'Poulie', H: 'Haltères', B: 'Barre', K: 'Kettlebell', E: 'Élastique', C: 'Poids du corps' };
 window.MUSCLES = ['Pecs', 'Dos', 'Épaules', 'Biceps', 'Triceps', 'Quadriceps', 'Ischios', 'Fessiers', 'Mollets', 'Abdos', 'Avant-bras', 'Cardio'];

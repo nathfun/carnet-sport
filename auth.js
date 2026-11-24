@@ -112,6 +112,6 @@ function setup() {
   if (w > 30 && w < 250 && Math.abs(w - C().body().w) > .01) S.body.weights = [...(S.body.weights || []), { t: Date.now(), kg: w }];
   const g = v('au-goal').match(/^(\d{1,2})[:'h.,](\d{2})$/); if (g) S.set.goalPace = +g[1] * 60 + +g[2];
   if (v('au-obj')) S.set.obj = v('au-obj').slice(0, 200);
-  C().save(); C().go('home'); C().toast('Ton profil est prêt 💪');
+  C().save(); C().go('guide'); C().toast('Ton profil est prêt 💪');
 }
 }

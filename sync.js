@@ -115,7 +115,7 @@ async function run(opts = {}) {
     const S = C().S(); track(S);
     if (cfg.strava) { try { const q = await api('/strava/pull' + (opts.loud ? '?force=1' : ''), { method: 'POST' }); if (q.ok) { const j = await q.json(); if (j.added > 0) cfg.stravaNew = j.added; } } catch (_) { } }
     let r = await (await api('/state')).json();
-    if (r.data && !cfg.rev && !opts.choice) { if (!(S.log || []).length && !Object.keys(S._mt || {}).length) opts.choice = 'theirs'; else { busy = false; setStatus(''); return firstChoice(); } }
+    if (r.data && !cfg.rev && !opts.choice) { if (!(S.log || []).length) opts.choice = 'theirs'; else { busy = false; setStatus(''); return firstChoice(); } }
     if (opts.choice === 'mine') { const now = Date.now(); for (const k of Object.keys(S)) if (!LOCAL.has(k)) S._mt[k] = now; }
     if (opts.choice === 'theirs') S._mt = {};
     for (let tries = 0; tries < 3; tries++) {
@@ -133,6 +133,7 @@ async function run(opts = {}) {
     cfg.last = Date.now(); saveCfg();
     setStatus('✓ Synchronisé' + (m.down ? ` · ${m.down} média(s) reçu(s)` : '') + (m.up ? ` · ${m.up} envoyé(s)` : '') + (m.skipped ? ` · ${m.skipped} vidéo(s) trop lourde(s)` : ''));
     if (C().S().draft == null || document.body.dataset.view !== 'workout') C().render();
+    if (window.SOCIAL) window.SOCIAL.pullNotifs();
     if (cfg.stravaNew) { C().toast(cfg.stravaNew + ' sortie(s) Strava ajoutée(s)'); cfg.stravaNew = 0; saveCfg(); }
     else if (opts.loud) C().toast('Synchronisé ✓');
   } catch (e) {

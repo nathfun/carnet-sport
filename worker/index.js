@@ -156,6 +156,41 @@ async function listMedia(env, u) {
   return out;
 }
 
+/* ---------- amis, profil public, fil ---------- */
+const PRIV0 = { vis: 'friends', share: { gym: true, run: true, bike: true, loads: true, prs: true }, bio: '' };
+const getPriv = async (env, u) => { const p = await env.KV.get('p:' + u, 'json'); return { ...PRIV0, ...(p || {}), share: { ...PRIV0.share, ...((p || {}).share || {}) } }; };
+const getF = async (env, u) => ({ friends: [], in: [], out: [], ...((await env.KV.get('f:' + u, 'json')) || {}) });
+const putF = (env, u, f) => env.KV.put('f:' + u, JSON.stringify(f));
+const without = (a, x) => (a || []).filter(y => y !== x);
+async function canSee(env, viewer, owner, priv) {
+  if (viewer === owner) return true; priv = priv || await getPriv(env, owner);
+  if (priv.vis === 'public') return true; if (priv.vis !== 'friends') return false;
+  return (await getF(env, owner)).friends.includes(viewer);
+}
+const kindOf = l => l.kind === 'run' ? 'run' : l.kind === 'bike' ? 'bike' : 'gym';
+function summary(l, sh) {
+  const k = kindOf(l); if (l.hide || !sh[k]) return null;
+  const o = { id: l.id, kind: k, name: String(l.name || '').slice(0, 80), start: l.start, end: l.end };
+  if (k === 'gym') {
+    const ex = l.ex || [], sets = ex.reduce((a, e) => a + (e.sets || []).filter(x => x.t !== 'e').length, 0);
+    Object.assign(o, { nex: ex.length, nsets: sets, feel: l.feel || '', exos: ex.slice(0, 8).map(e => { const w = (e.sets || []).filter(x => x.t !== 'e'); const b = w.reduce((m, x) => (+String(x.kg).replace(',', '.') || 0) > m.kg ? { kg: +String(x.kg).replace(',', '.') || 0, r: x.r } : m, { kg: 0, r: 0 }); return sh.loads ? { n: e.n, best: b.kg ? b.kg + ' kg × ' + (b.r || '?') : '', sets: w.length } : { n: e.n, sets: w.length }; }) });
+    if (sh.loads) o.vol = Math.round(l.vol || 0); if (sh.prs) o.prs = (l.prs || []).slice(0, 6);
+  } else Object.assign(o, { km: l.km, sec: l.sec, pace: l.pace || null, kmh: l.kmh || null, elev: l.elev || 0, src: l.src || '' });
+  return o;
+}
+async function actsOf(env, owner, n = 30) {
+  const st = await env.KV.get(stKey(owner), 'json'), priv = await getPriv(env, owner);
+  const log = ((st && st.data && st.data.log) || []).slice().sort((a, b) => b.start - a.start);
+  const out = []; for (const l of log) { const s = summary(l, priv.share); if (s) out.push(s); if (out.length >= n) break; }
+  return out;
+}
+const names = new Map();
+async function nameOf(env, u) { if (names.has(u)) return names.get(u); const x = await getUser(env, u); const n = x ? x.name : u; names.set(u, n); return n; }
+async function notify(env, to, n) { if (!to || to === n.from) return; const L = (await env.KV.get('n:' + to, 'json')) || []; L.unshift({ ...n, t: Date.now() }); await env.KV.put('n:' + to, JSON.stringify(L.slice(0, 60))); }
+async function withReacts(env, viewer, owner, acts) {
+  return Promise.all(acts.map(async a => { const r = (await env.KV.get('r:' + owner + ':' + a.id, 'json')) || { likes: [], comments: [] }; return { ...a, owner, likes: r.likes.length, liked: r.likes.includes(viewer), comments: r.comments.length }; }));
+}
+
 export default {
   async fetch(req, env, ctx) {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
@@ -246,6 +281,80 @@ export default {
       await env.KV.put('inv:' + code, JSON.stringify({ by: me, byName: user.name, uses: 20, exp }), { expirationTtl: 30 * 86400 });
       return json(req, { code, url: APP_URL + '?invite=' + code, exp });
     }
+
+    // ---- amis et fil ----
+    if (p.startsWith('/social/') && me === LEG) return json(req, { error: 'Crée d\'abord ton compte.' }, 400);
+    if (p === '/social/me' && req.method === 'GET') {
+      const f = await getF(env, me), mapN = async L => Promise.all(L.map(async u => ({ u, name: await nameOf(env, u) })));
+      return json(req, { privacy: await getPriv(env, me), friends: await mapN(f.friends), in: await mapN(f.in), out: await mapN(f.out) });
+    }
+    if (p === '/social/privacy' && req.method === 'POST') {
+      const cur = await getPriv(env, me), vis = ['public', 'friends', 'private'].includes(body.vis) ? body.vis : cur.vis, share = { ...cur.share };
+      for (const k of Object.keys(PRIV0.share)) if (body.share && typeof body.share[k] === 'boolean') share[k] = body.share[k];
+      const nx = { vis, share, bio: typeof body.bio === 'string' ? body.bio.slice(0, 160) : cur.bio };
+      await env.KV.put('p:' + me, JSON.stringify(nx)); return json(req, nx);
+    }
+    if (p === '/social/search' && req.method === 'GET') {
+      const q = String(url.searchParams.get('q') || '').trim().toLowerCase().replace(/^@/, ''); if (q.length < 2) return json(req, []);
+      const r = await env.KV.list({ prefix: 'u:' + q, limit: 10 }), f = await getF(env, me);
+      return json(req, await Promise.all(r.keys.map(k => k.name.slice(2)).filter(u => u !== me).map(async u => ({ u, name: await nameOf(env, u), rel: f.friends.includes(u) ? 'friend' : f.out.includes(u) ? 'out' : f.in.includes(u) ? 'in' : 'none' }))));
+    }
+    const fa = p.match(/^\/social\/(request|accept|decline|remove|cancel)$/);
+    if (fa && req.method === 'POST') {
+      const o = String(body.u || '').toLowerCase().replace(/^@/, ''); if (o === me || !(await getUser(env, o))) return json(req, { error: 'Pseudo introuvable.' }, 404);
+      const A = await getF(env, me), B = await getF(env, o), act = fa[1];
+      if (act === 'request') {
+        if (A.friends.includes(o)) return json(req, { ok: true, rel: 'friend' });
+        if (A.in.includes(o)) { A.in = without(A.in, o); B.out = without(B.out, me); A.friends.push(o); B.friends.push(me); await notify(env, o, { type: 'accept', from: me, fromName: user.name }); }
+        else { if (!A.out.includes(o)) A.out.push(o); if (!B.in.includes(me)) B.in.push(me); await notify(env, o, { type: 'req', from: me, fromName: user.name }); }
+      } else if (act === 'accept') {
+        if (!A.in.includes(o)) return json(req, { error: 'Pas de demande de cette personne.' }, 400);
+        A.in = without(A.in, o); B.out = without(B.out, me); if (!A.friends.includes(o)) A.friends.push(o); if (!B.friends.includes(me)) B.friends.push(me);
+        await notify(env, o, { type: 'accept', from: me, fromName: user.name });
+      } else if (act === 'decline') { A.in = without(A.in, o); B.out = without(B.out, me); }
+      else if (act === 'cancel') { A.out = without(A.out, o); B.in = without(B.in, me); }
+      else { A.friends = without(A.friends, o); B.friends = without(B.friends, me); }
+      await Promise.all([putF(env, me, A), putF(env, o, B)]);
+      return json(req, { ok: true, rel: A.friends.includes(o) ? 'friend' : A.out.includes(o) ? 'out' : 'none' });
+    }
+    if (p === '/social/feed' && req.method === 'GET') {
+      const f = await getF(env, me), people = [me, ...f.friends], all = [];
+      for (const u of people) { if (u !== me && !(await canSee(env, me, u))) continue; const acts = await actsOf(env, u, 15); const n = await nameOf(env, u); for (const a of acts) all.push({ ...a, owner: u, ownerName: n }); }
+      all.sort((a, b) => b.start - a.start);
+      const page = all.slice(0, 40);
+      return json(req, await Promise.all(page.map(async a => { const r = (await env.KV.get('r:' + a.owner + ':' + a.id, 'json')) || { likes: [], comments: [] }; return { ...a, likes: r.likes.length, liked: r.likes.includes(me), comments: r.comments.length }; })));
+    }
+    const pm = p.match(/^\/social\/profile\/([a-z0-9_.-]{3,20})$/);
+    if (pm && req.method === 'GET') {
+      const o = pm[1], x = await getUser(env, o); if (!x) return json(req, { error: 'introuvable' }, 404);
+      const priv = await getPriv(env, o), F = await getF(env, me), vis = await canSee(env, me, o, priv);
+      const rel = o === me ? 'self' : F.friends.includes(o) ? 'friend' : F.out.includes(o) ? 'out' : F.in.includes(o) ? 'in' : 'none';
+      const out = { u: o, name: x.name, bio: priv.bio, vis: priv.vis, rel, visible: vis, since: x.created };
+      if (vis) { const acts = await actsOf(env, o, 60), now = new Date(), mo = acts.filter(a => { const d = new Date(a.start); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
+        out.stats = { gym: mo.filter(a => a.kind === 'gym').length, run: mo.filter(a => a.kind === 'run').reduce((s, a) => s + (a.km || 0), 0), bike: mo.filter(a => a.kind === 'bike').reduce((s, a) => s + (a.km || 0), 0), n: acts.length };
+        out.acts = (await Promise.all(acts.slice(0, 20).map(async a => { const r = (await env.KV.get('r:' + o + ':' + a.id, 'json')) || { likes: [], comments: [] }; return { ...a, owner: o, ownerName: x.name, likes: r.likes.length, liked: r.likes.includes(me), comments: r.comments.length }; }))); }
+      return json(req, out);
+    }
+    const am2 = p.match(/^\/social\/act\/([a-z0-9_.-]{3,20})\/([A-Za-z0-9_.-]{1,60})$/);
+    if (am2 && req.method === 'GET') {
+      const [, o, id] = am2; if (!(await canSee(env, me, o))) return json(req, { error: 'privé' }, 403);
+      const a = (await actsOf(env, o, 500)).find(x => x.id === id); if (!a) return json(req, { error: 'introuvable' }, 404);
+      const r = (await env.KV.get('r:' + o + ':' + id, 'json')) || { likes: [], comments: [] };
+      return json(req, { act: { ...a, owner: o, ownerName: await nameOf(env, o) }, likes: await Promise.all(r.likes.map(u => nameOf(env, u))), liked: r.likes.includes(me), comments: r.comments });
+    }
+    if ((p === '/social/like' || p === '/social/comment' || p === '/social/uncomment') && req.method === 'POST') {
+      const o = String(body.owner || ''), id = String(body.id || '');
+      if (!UNAME.test(o) || !id || !(await canSee(env, me, o))) return json(req, { error: 'Activité non visible.' }, 403);
+      const a = (await actsOf(env, o, 500)).find(x => x.id === id); if (!a) return json(req, { error: 'Activité introuvable.' }, 404);
+      const k = 'r:' + o + ':' + id, r = (await env.KV.get(k, 'json')) || { likes: [], comments: [] };
+      if (p === '/social/like') { if (r.likes.includes(me)) r.likes = without(r.likes, me); else { r.likes.push(me); await notify(env, o, { type: 'like', from: me, fromName: user.name, act: id, actName: a.name }); } }
+      else if (p === '/social/comment') { const txt = String(body.txt || '').trim().slice(0, 500); if (!txt) return json(req, { error: 'Commentaire vide.' }, 400); r.comments.push({ id: rnd(6), u: me, name: user.name, t: Date.now(), txt }); await notify(env, o, { type: 'comment', from: me, fromName: user.name, act: id, actName: a.name, txt: txt.slice(0, 80) }); }
+      else { const c = r.comments.find(x => x.id === body.cid); if (!c || (c.u !== me && o !== me)) return json(req, { error: 'Impossible.' }, 403); r.comments = r.comments.filter(x => x.id !== body.cid); }
+      await env.KV.put(k, JSON.stringify(r));
+      return json(req, { likes: r.likes.length, liked: r.likes.includes(me), comments: r.comments });
+    }
+    if (p === '/notifs' && req.method === 'GET') { const L = (await env.KV.get('n:' + me, 'json')) || []; const seen = +(await env.KV.get('ns:' + me)) || 0; return json(req, L.map(n => ({ ...n, fresh: n.t > seen }))); }
+    if (p === '/notifs/seen' && req.method === 'POST') { await env.KV.put('ns:' + me, String(Date.now())); return json(req, { ok: true }); }
     // ---- administration (Nathan) ----
     if (p.startsWith('/admin/')) {
       if (!user.admin || me === LEG) return json(req, { error: 'réservé à l\'administrateur' }, 403);
