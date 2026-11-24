@@ -116,7 +116,7 @@ const app = $('#app');
 function go(v) { view = v; render(); window.scrollTo(0, 0); }
 function render() {
   for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('sel', b.dataset.view === view);
-  app.innerHTML = ({ home: vHome, workout: vWorkout, program: vProgram, exos: vExos, progress: vProgress, coach: vCoach }[view] || vHome)();
+  app.innerHTML = ({ home: vHome, workout: vWorkout, program: () => progSub === 'exos' ? subTabs() + vExos() : subTabs() + vProgram(), progress: vProgress, coach: vCoach }[view] || vHome)();
   if (view === 'workout' && S.draft) { const c = S.draft.ex[S.draft.cur]; if (c) fillMedia(c.id); }
   if (view === 'progress') drawChart();
   tick();
@@ -137,6 +137,7 @@ function vHome() {
       : `<div class="card next"><p class="tiny">Conseillée : c'est celle que tu as faite il y a le plus longtemps</p><h2>${esc(sug.name)}</h2><p class="mute small">${esc(sug.sub || '')}</p>
       <div class="row" style="margin-top:10px"><button class="p grow" data-act="start" data-sid="${sug.id}">Commencer</button>${spotifyBtn('grow')}</div></div>`}
   ${!S.set.spotify ? `<p class="tiny">Ajoute le lien de ta playlist dans Réglages pour avoir un bouton Spotify ici.</p>` : ''}
+  ${S.cal ? (() => { const r = calc(S.cal); return `<div class="card"><div class="between"><div><div class="tiny">Objectif nutrition (${{ recompo: 'recompo', prise: 'prise de muscle', seche: 'sèche' }[S.cal.goal]})</div><h3>${r.avg} kcal · ${r.p} g de protéines</h3></div><button class="sm" data-act="goto" data-v="coach" onclick="">Voir</button></div></div>`; })() : ''}
   <div class="sec">Choisir une autre séance</div>
   <div class="card">${S.program.map(s => { const l = lastDone(s.id); return `<div class="sess"><div><h3>${esc(s.name)}</h3><div class="tiny">${s.ex.length} exercices · ${l ? 'dernière fois ' + dateFr(l) : 'jamais faite'}</div></div><button class="sm" data-act="start" data-sid="${s.id}" ${D ? 'disabled' : ''}>Lancer</button></div>`; }).join('')}
     <div class="sess"><div><h3>Séance libre</h3><div class="tiny">Tu ajoutes les exercices au fur et à mesure</div></div><button class="sm" data-act="start" data-sid="" ${D ? 'disabled' : ''}>Lancer</button></div></div>
@@ -149,8 +150,8 @@ function vHome() {
   <div class="badges">${BADGES.filter(b => S.badges[b.id]).slice(-6).map(b => badgeHtml(b, true)).join('') || '<p class="tiny">Termine ta première séance pour débloquer ton premier palier.</p>'}</div>`;
 }
 
-const demoBlock = (id, q, label) => `<details data-mfor="${esc(id)}" ${S.guides[id] ? 'open' : ''}><summary>${label}</summary>
-  ${S.guides[id] ? `<p class="small" style="white-space:pre-wrap">${esc(S.guides[id])}</p>` : ''}
+const demoBlock = (id, q, label) => `<details data-mfor="${esc(id)}" ${S.guides[id] || metaOf(id).tip ? 'open' : ''}><summary>${label}</summary>
+  ${S.guides[id] ? `<p class="small" style="white-space:pre-wrap">${esc(S.guides[id])}</p>` : metaOf(id).tip ? `<p class="small mute">Conseil : ${esc(metaOf(id).tip)}</p>` : ''}
   <div class="media" data-media="${esc(id)}"></div>
   <div class="row"><label class="btn sm">Ajouter photo, GIF ou vidéo<input type="file" accept="image/*,video/*" multiple hidden data-add="${esc(id)}"></label><a class="btn sm" href="${yt(q)}" target="_blank" rel="noopener">Vidéos YouTube</a></div></details>`;
 function exCard(e, i, D) {
@@ -188,8 +189,10 @@ function vWorkout() {
     <button class="ghost wide" style="margin-top:8px" data-act="abort">Abandonner la séance</button></div>`;
 }
 
+let progSub = 'prog', coachSub = 'claude';
+const subTabs = () => `<h1>Programme</h1><div class="seg" style="margin:12px 0">${[['prog', 'Mes séances'], ['exos', 'Exercices']].map(([k, l]) => `<button class="${progSub === k ? 'sel' : ''}" data-act="psub" data-k="${k}">${l}</button>`).join('')}</div>`;
 function vProgram() {
-  return `<h1>Programme</h1><p class="mute small">Modifie tes séances : exercices, séries, répétitions, repos. Lance n'importe quelle séance n'importe quel jour depuis l'accueil.</p>
+  return `<p class="mute small">Modifie tes séances : exercices, séries, répétitions, repos. Lance n'importe quelle séance n'importe quel jour depuis l'accueil.</p>
   ${S.program.map((s, si) => `<div class="card"><div class="row"><label class="grow">Nom de la séance<input value="${esc(s.name)}" data-pf="name" data-si="${si}"></label></div>
     <label style="margin-top:8px">Description<input value="${esc(s.sub || '')}" data-pf="sub" data-si="${si}"></label>
     <div style="margin-top:10px">${s.ex.map((e, ei) => `<div class="prog-ex">
@@ -261,15 +264,15 @@ function exosList() {
 }
 function vExos() {
   const EQ = window.EQUIP || {}, MU = window.MUSCLES || [];
-  return `<h1>Exercices</h1><p class="mute small">${allEx().size} exercices. Touche-en un pour voir ton record, écrire un guide ou ajouter tes photos et vidéos.</p>
+  return `<p class="mute small">${allEx().size} exercices. Touche-en un pour voir ton record, écrire un guide ou ajouter tes photos et vidéos.</p>
   <input id="xq" data-f="xq" value="${esc(xq)}" placeholder="Chercher un exercice" autocomplete="off" style="margin-top:10px">
   <div class="chips scrollx" style="margin-top:8px">${MU.map(m => `<button class="sm ${xM === m ? 'sel' : ''}" data-act="xm" data-v="${esc(m)}">${esc(m)}</button>`).join('')}</div>
-  <div class="chips scrollx" style="margin-top:6px"><button class="sm ${xE === 'G' ? 'sel' : ''}" data-act="xe" data-v="G">Machines guidées</button>${['P', 'H', 'B', 'C'].map(k => `<button class="sm ${xE === k ? 'sel' : ''}" data-act="xe" data-v="${k}">${EQ[k]}</button>`).join('')}</div>
+  <div class="chips scrollx" style="margin-top:6px"><button class="sm ${xE === 'G' ? 'sel' : ''}" data-act="xe" data-v="G">Machines guidées</button>${['P', 'H', 'B', 'K', 'E', 'C'].map(k => `<button class="sm ${xE === k ? 'sel' : ''}" data-act="xe" data-v="${k}">${EQ[k]}</button>`).join('')}</div>
   <div class="card" id="xlist" style="padding:4px 12px">${exosList()}</div>`;
 }
 function exInfo(id) {
   const e = allEx().get(id); if (!e) return; const m = metaOf(id), R = REC.get(id), l = lastSets(id), D = S.draft;
-  sheet(`<h2>${esc(e.n)}</h2><p class="tiny">${esc([m.m, (window.EQUIP || {})[m.eq]].filter(Boolean).join(' · '))} · ${e.sets} × ${esc(e.reps)} · repos ${restLabel(+e.rest)}</p>
+  sheet(`<h2>${esc(e.n)}</h2><p class="tiny">${esc([m.m, (window.EQUIP || {})[m.eq]].filter(Boolean).join(' · '))} · ${e.sets} × ${esc(e.reps)} · repos ${restLabel(+e.rest)}</p>${m.tip ? `<p class="small" style="margin-top:8px">${esc(m.tip)}</p>` : ''}
     <div class="stats" style="margin-top:10px"><div class="stat"><div class="tiny">Record</div><div class="num">${R ? R.kg + ' kg' : '—'}</div></div><div class="stat"><div class="tiny">1RM estimé</div><div class="num">${R ? R.e1 + ' kg' : '—'}</div></div><div class="stat"><div class="tiny">Dernière fois</div><div class="small"><b>${l ? esc(setsTxt(l)) : '—'}</b></div></div></div>
     <label style="margin-top:12px">Guide / consignes<textarea rows="3" data-guide="${esc(id)}" placeholder="Ex. siège cran 4, dos collé, pousser sans verrouiller les coudes">${esc(S.guides[id] || '')}</textarea></label>
     <div class="media" data-media="${esc(id)}"></div>
@@ -289,9 +292,32 @@ function coachPrompt(q) {
   const prog = S.program.map(s => `${s.name} : ` + s.ex.map(e => `${e.n} ${e.sets}×${e.reps}`).join(', ')).join('\n');
   return `Je suis Nathan (67 kg, 1,76 m), étudiant ingénieur. Objectifs : prendre du muscle et être sec pour l'été, courir 10 km à 4:30/km, vélo de route. Je t'écris depuis mon appli Carnet sport.\n\nMon programme muscu :\n${prog}\n\nMes dernières séances :\n${recent}\n\nFlamme : ${streak().n} semaine(s) d'affilée.\n\nMa question : ${q}`;
 }
+const CAL0 = { age: 20, h: 176, w: 67, muscu: 4, dur: 75, run: 15, bike: 60, goal: 'recompo' };
+function calc(c) {
+  const bmr = 10 * c.w + 6.25 * c.h - 5 * c.age + 5, base = bmr * 1.4;
+  const kMuscu = c.dur / 60 * 5 * c.w, week = c.muscu * kMuscu + c.run * c.w * 1.0 + c.bike * c.w * 0.3;
+  const adj = { recompo: 0, prise: 250, seche: -400 }[c.goal] || 0;
+  const avg = Math.round((base + week / 7 + adj) / 10) * 10, p = Math.round(2 * c.w), f = Math.round(0.9 * c.w), g = Math.max(0, Math.round((avg - p * 4 - f * 9) / 4));
+  return { bmr: Math.round(bmr), avg, rest: Math.round((base + adj) / 10) * 10, gym: Math.round((base + kMuscu + adj) / 10) * 10, p, f, g, week: Math.round(week) };
+}
+function vCalories() {
+  if (!S.cal) { const wk = S.log.filter(s => s.start > Date.now() - 28 * 864e5).length; S.cal = { ...CAL0, muscu: wk ? Math.max(1, Math.round(wk / 4)) : 4 }; }
+  const c = S.cal, r = calc(c), f = (k, l, u, step = 1) => `<label>${l}<div class="unit"><input inputmode="decimal" data-cal="${k}" value="${c[k]}" step="${step}"><span>${u}</span></div></label>`;
+  const goalTxt = { recompo: 'Tu manges ce que tu dépenses : le muscle se construit pendant que le gras baisse doucement. Idéal à 67 kg pour 1,76 m.', prise: "Léger surplus : prise de muscle plus rapide, avec un peu de gras. Utile si tu ne progresses plus aux charges.", seche: "Déficit modéré pour sécher vite avant l'été. Garde les protéines hautes pour ne pas perdre de muscle." }[c.goal];
+  return `<div class="card summary"><div class="tiny">Par jour en moyenne</div><div class="num" style="font-size:48px">${r.avg} <small style="font-size:20px">kcal</small></div>
+    <div class="stats" style="margin-top:10px"><div class="stat"><div class="tiny">Protéines</div><div class="num">${r.p}<small style="font-size:16px"> g</small></div></div><div class="stat"><div class="tiny">Glucides</div><div class="num">${r.g}<small style="font-size:16px"> g</small></div></div><div class="stat"><div class="tiny">Lipides</div><div class="num">${r.f}<small style="font-size:16px"> g</small></div></div></div>
+    <p class="small" style="margin-top:10px">Jour de muscu : <b>${r.gym} kcal</b> · jour de repos : <b>${r.rest} kcal</b></p></div>
+  <div class="seg">${[['recompo', 'Recompo'], ['prise', 'Prise de muscle'], ['seche', 'Sèche']].map(([k, l]) => `<button class="${c.goal === k ? 'sel' : ''}" data-act="calgoal" data-k="${k}">${l}</button>`).join('')}</div>
+  <p class="small mute" style="margin-top:8px">${goalTxt}</p>
+  <div class="card"><h3>Toi</h3><div class="trio" style="margin-top:6px">${f('w', 'Poids', 'kg', .1)}${f('h', 'Taille', 'cm')}${f('age', 'Âge', 'ans')}</div>
+    <h3 style="margin-top:14px">Ta semaine de sport</h3><div class="trio" style="margin-top:6px">${f('muscu', 'Muscu', '/sem')}${f('dur', 'Durée', 'min')}${f('run', 'Course', 'km')}</div><div class="trio">${f('bike', 'Vélo', 'km')}</div>
+    <p class="tiny" style="margin-top:10px">Métabolisme de base ${r.bmr} kcal (formule de Mifflin-St Jeor), vie d'étudiant ×1,4, plus ${r.week} kcal de sport par semaine. C'est une estimation à ±10 % : pèse-toi 3 matins par semaine et regarde la moyenne. Si elle bouge de plus de 0,5 kg en 3 semaines alors que tu vises la recompo, ajuste de 150 kcal.</p></div>`;
+}
 function vCoach() {
   const on = navigator.onLine;
-  return `<h1>Coach</h1><p class="mute small">Ta question part chez Claude avec tes dernières séances et ton programme. Tu n'as rien à réexpliquer.</p>
+  const tabs = `<h1>Coach</h1><div class="seg" style="margin:12px 0">${[['claude', 'Demander à Claude'], ['cal', 'Calories']].map(([k, l]) => `<button class="${coachSub === k ? 'sel' : ''}" data-act="csub" data-k="${k}">${l}</button>`).join('')}</div>`;
+  if (coachSub === 'cal') return tabs + vCalories();
+  return tabs + `<p class="mute small">Ta question part chez Claude avec tes dernières séances et ton programme. Tu n'as rien à réexpliquer.</p>
   ${on ? '' : '<p class="offline">Pas de réseau en ce moment. Écris ta question, elle reste prête pour quand tu en retrouves.</p>'}
   <div class="card"><div class="chips">${QUICK.map((q, i) => `<button data-act="quick" data-i="${i}">${esc(q)}</button>`).join('')}</div>
     <label style="margin-top:12px">Ta question<textarea rows="3" id="cq" data-f="coachq">${esc(S.coachQ || '')}</textarea></label>
@@ -373,7 +399,7 @@ function addExSheet(target = 'draft', si) {
   sheet(`<h2>Ajouter un exercice</h2>
     <label style="margin-top:10px">Chercher<input id="exq" placeholder="Ex. curl, tirage, presse…" autocomplete="off"></label>
     <div class="chips scrollx" style="margin-top:8px">${MU.map(m => `<button class="sm" data-act="fm" data-v="${esc(m)}">${esc(m)}</button>`).join('')}</div>
-    <div class="chips scrollx" style="margin-top:6px"><button class="sm" data-act="fe" data-v="G">Machines guidées</button>${['P', 'H', 'B', 'C'].map(k => `<button class="sm" data-act="fe" data-v="${k}">${EQ[k]}</button>`).join('')}</div>
+    <div class="chips scrollx" style="margin-top:6px"><button class="sm" data-act="fe" data-v="G">Machines guidées</button>${['P', 'H', 'B', 'K', 'E', 'C'].map(k => `<button class="sm" data-act="fe" data-v="${k}">${EQ[k]}</button>`).join('')}</div>
     <div id="exlist" style="margin-top:6px;max-height:36vh;overflow:auto"></div>
     <div class="sec">Ou créer un nouvel exercice</div>
     <label>Nom<input id="nn" placeholder="Ex. Presse à cuisses inclinée"></label>
@@ -400,13 +426,14 @@ function settingsSheet() {
   <label style="margin-top:10px">Repos entre deux exercices<select id="exrest">${[90, 120, 150, 180, 240].map(n => `<option value="${n}" ${n === S.set.exRest ? 'selected' : ''}>${fmt(n)}</option>`).join('')}</select></label>
   <button class="p wide" style="margin-top:14px" data-act="saveset">Enregistrer</button>
   <div class="sec">Sauvegarde</div>
-  <p class="tiny">Tout est enregistré sur ton téléphone. Fais un export de temps en temps (Fichiers ou iCloud) pour ne rien perdre si tu changes de téléphone.</p>
+  <p class="tiny">Tout est enregistré sur cet appareil (téléphone ou ordi), sans synchro automatique. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
   <div class="row"><button class="grow" data-act="export">Exporter mes données</button><label class="btn grow">Importer<input type="file" accept="application/json,.json" hidden id="impf"></label></div>
   <button class="ghost wide" style="margin-top:8px" data-close>Fermer</button>`);
 }
 
 /* ---------- toast ---------- */
-let tt = null;
+let tt = null, calT = null;
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200); }
 
 /* ---------- événements ---------- */
@@ -444,6 +471,9 @@ document.addEventListener('click', async ev => {
       save(); render(); break; }
     case 'stype': { const s = cur.sets[+b.dataset.j], o = ['', 'e', 'd', 'f']; s.t = o[(o.indexOf(s.t || '') + 1) % 4]; save(); render(); break; }
     case 'superset': { const n = D.ex[D.cur + 1]; if (!n) break; if (cur.ss && n.ss === cur.ss) { const g = cur.ss; for (const x of D.ex) if (x.ss === g) delete x.ss; } else { const g = cur.ss || uid(); cur.ss = g; n.ss = g; } save(); render(); break; }
+    case 'calgoal': S.cal.goal = b.dataset.k; save(); render(); break;
+    case 'psub': progSub = b.dataset.k; render(); break;
+    case 'csub': coachSub = b.dataset.k; render(); break;
     case 'xm': xM = xM === b.dataset.v ? '' : b.dataset.v; render(); break;
     case 'xe': xE = xE === b.dataset.v ? '' : b.dataset.v; render(); break;
     case 'exinfo': exInfo(b.dataset.id); break;
@@ -474,7 +504,12 @@ document.addEventListener('click', async ev => {
     case 'ask': { const q = ($('#cq').value || '').trim() || QUICK[0]; const p = coachPrompt(q); try { await navigator.clipboard.writeText(p); } catch (e) { } const l = document.createElement('a'); l.href = 'https://claude.ai/new?q=' + encodeURIComponent(p.slice(0, 6000)); l.target = '_blank'; l.rel = 'noopener'; document.body.appendChild(l); l.click(); l.remove(); break; }
     case 'copyctx': { const p = coachPrompt(($('#cq').value || '').trim() || '(écris ta question ici)'); try { await navigator.clipboard.writeText(p); toast('Résumé copié : colle-le dans Claude'); } catch (e) { sheet(`<h2>Ton résumé</h2><p class="tiny">Sélectionne le texte et copie-le.</p><textarea rows="12" readonly>${esc(p)}</textarea><button class="wide" style="margin-top:8px" data-close>Fermer</button>`); } break; }
     case 'saveset': { const v = $('#spurl').value.trim(); if (v && !/^https:\/\/(open\.)?spotify\.com\//.test(v) && !/^https:\/\/spotify\.link\//.test(v)) { toast('Colle un lien Spotify (https://open.spotify.com/…)'); break; } S.set.spotify = v; S.set.goal = +$('#goal').value; S.set.exRest = +$('#exrest').value; save(); closeSheet(); render(); toast('Réglages enregistrés'); break; }
-    case 'export': { const blob = new Blob([JSON.stringify({ app: 'carnet-sport', v: 1, at: Date.now(), program: S.program, lib: S.lib, log: S.log, badges: S.badges, best: S.best, set: S.set, guides: S.guides })], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(blob); l.download = 'carnet-sport-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(l); l.click(); l.remove(); toast('Fichier exporté'); break; }
+    case 'export': { b.disabled = true; b.textContent = 'Préparation…'; const withMedia = $('#expmedia')?.checked; let media = [];
+      if (withMedia) { await idbReady; media = await new Promise(res => { if (!idb) return res([]); const q = idb.transaction('media').objectStore('media').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); media = await Promise.all(media.map(m => new Promise(r => { const fr = new FileReader(); fr.onload = () => r({ ex: m.ex, type: m.type, size: m.blob.size, data: fr.result }); fr.onerror = () => r(null); fr.readAsDataURL(m.blob); }))); media = media.filter(Boolean); }
+      const blob = new Blob([JSON.stringify({ app: 'carnet-sport', v: 2, at: Date.now(), program: S.program, lib: S.lib, log: S.log, badges: S.badges, best: S.best, set: S.set, guides: S.guides, cal: S.cal, media })], { type: 'application/json' });
+      const name = 'carnet-sport-' + new Date().toISOString().slice(0, 10) + '.json', file = new File([blob], name, { type: 'application/json' });
+      try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Carnet sport' }); } else throw 0; } catch (e) { if (e && e.name === 'AbortError') { b.disabled = false; b.textContent = 'Exporter mes données'; break; } const l = document.createElement('a'); l.href = URL.createObjectURL(blob); l.download = name; document.body.appendChild(l); l.click(); l.remove(); }
+      b.disabled = false; b.textContent = 'Exporter mes données'; toast(media.length ? `Exporté avec ${media.length} photo(s)/vidéo(s)` : 'Fichier exporté'); break; }
   }
 });
 document.addEventListener('input', ev => {
@@ -482,6 +517,7 @@ document.addEventListener('input', ev => {
   if (t.dataset.f === 'kg' || t.dataset.f === 'r') { const c = D.ex[D.cur]; c.sets[+t.dataset.j][t.dataset.f] = t.value; save(); }
   else if (t.dataset.f === 'note' && D) { D.note = t.value; save(); }
   else if (t.dataset.guide) { const v = t.value; if (v.trim()) S.guides[t.dataset.guide] = v; else delete S.guides[t.dataset.guide]; save(); }
+  else if (t.dataset.cal) { const v = num(t.value); if (v > 0 || (t.dataset.cal !== 'w' && t.dataset.cal !== 'h' && t.dataset.cal !== 'age' && t.value.trim() === '0')) { S.cal[t.dataset.cal] = v; save(); clearTimeout(calT); calT = setTimeout(() => { const pos = t.dataset.cal; render(); const el = document.querySelector(`[data-cal="${pos}"]`); if (el) { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) { } } }, 700); } }
   else if (t.dataset.f === 'xq') { xq = t.value; $('#xlist').innerHTML = exosList(); }
   else if (t.dataset.f === 'coachq') { S.coachQ = t.value; save(); }
   else if (t.dataset.pf) { const s = S.program[+t.dataset.si]; if (t.dataset.ei === undefined) s[t.dataset.pf] = t.value; else { const e = s.ex[+t.dataset.ei], f = t.dataset.pf; e[f] = f === 'sets' || f === 'rest' ? (parseInt(t.value) || 0) : t.value; if (f === 'n') e.q = t.value + ' technique'; } save(); }
@@ -493,7 +529,8 @@ document.addEventListener('change', async ev => {
   else if (t.id === 'impf' && t.files[0]) {
     try { const v = JSON.parse(await t.files[0].text()); if (v.app !== 'carnet-sport' || !Array.isArray(v.log)) throw 0;
       const have = new Set(S.log.map(s => s.id)); for (const s of v.log) if (s && s.id && !have.has(s.id)) S.log.push(s); S.log.sort((a, b) => a.start - b.start);
-      if (Array.isArray(v.program) && v.program.length) S.program = v.program; if (Array.isArray(v.lib)) S.lib = v.lib; S.badges = { ...v.badges, ...S.badges }; S.best = Math.max(S.best || 0, v.best || 0); if (v.set) S.set = { ...S.set, ...v.set }; if (v.guides) S.guides = { ...v.guides, ...S.guides };
+      if (Array.isArray(v.program) && v.program.length) S.program = v.program; if (Array.isArray(v.lib)) S.lib = v.lib; S.badges = { ...v.badges, ...S.badges }; S.best = Math.max(S.best || 0, v.best || 0); if (v.set) S.set = { ...S.set, ...v.set }; if (v.guides) S.guides = { ...S.guides, ...v.guides }; if (v.cal && !S.cal) S.cal = v.cal;
+      if (Array.isArray(v.media) && v.media.length) { await idbReady; const have = await new Promise(res => { if (!idb) return res([]); const q = idb.transaction('media').objectStore('media').getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); let n = 0; for (const m of v.media) { if (!m || typeof m.data !== 'string' || !m.data.startsWith('data:') || have.some(h => h.ex === m.ex && h.blob.size === m.size)) continue; const blob = await (await fetch(m.data)).blob(); await mediaTx(st => st.add({ ex: String(m.ex), blob, type: String(m.type || blob.type) })); n++; } if (n) toast(n + ' photo(s)/vidéo(s) importée(s)'); }
       refreshRec(); save(); closeSheet(); render(); toast('Données importées'); } catch (e) { toast("Ce fichier n'est pas une sauvegarde Carnet sport"); }
   }
 });

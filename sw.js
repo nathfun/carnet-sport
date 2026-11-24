@@ -1,6 +1,6 @@
 // Garde l'app sur le téléphone pour qu'elle s'ouvre sans réseau.
 // Change VERSION à chaque mise à jour de l'app.
-const VERSION = 'carnet-v5';
+const VERSION = 'carnet-v6';
 const FILES = ['./', 'index.html', 'style.css', 'library.js', 'app.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
