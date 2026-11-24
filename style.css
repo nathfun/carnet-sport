@@ -668,3 +668,34 @@ body[data-view=workout] .gm-in .gbody{--body:#e3e5ea;--mz:#cdd1d8;--hot:#e8461b}
 .ch-tip{position:absolute;top:6px;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.45;padding:6px 9px;border-radius:9px;pointer-events:none;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 @media(min-width:900px){.actgrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @media(max-width:480px){.hzb{grid-template-columns:30px 90px minmax(0,1fr) 56px}}
+/* ===== journal v2 ===== */
+.jgrid2{display:grid;gap:12px}.jgrid2>.tcard{margin:0}
+.weekcard .wkt{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.wkt>div{background:color-mix(in srgb,var(--c) 10%,var(--card));border-radius:14px;padding:10px}.wkt span{font-size:18px}.wkt b{display:block;font-size:24px;font-weight:900;letter-spacing:-.02em;color:var(--c)}.wkt small{font-size:12px;color:var(--mute)}
+.wstrip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.wd{text-align:center;background:var(--card2);border-radius:12px;padding:6px 0}.wd small{display:block;font-size:11px;font-weight:800;color:var(--mute)}.wd span{display:block;font-size:14px;font-weight:700;min-height:22px;line-height:22px;color:var(--mute)}
+.wd.on{background:color-mix(in srgb,var(--acc) 14%,var(--card))}.wd.on span{font-size:15px}.wd.today{outline:2px solid var(--ink)}
+.lastact .la-h{display:flex;gap:12px;align-items:center}.lastact .la-h b{display:block;font-size:18px}.lastact .la-h small{color:var(--mute);font-size:13px}
+.a-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px;background:color-mix(in srgb,var(--c) 16%,var(--card));flex:none}.a-ic.big{width:48px;height:48px;font-size:24px}
+.la-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.la-k div{background:var(--card2);border-radius:12px;padding:8px 10px}.la-k b{display:block;font-size:20px;font-weight:900}.la-k small{font-size:12px;color:var(--mute)}
+.arow{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;padding:10px 0;border-bottom:1px solid var(--line)}.arow:last-child{border-bottom:0}.a-t b{display:block;font-size:15px}.a-t small{display:block;font-size:12px;color:var(--mute);margin-top:2px}
+.cols{margin-top:6px}.cols-a{position:relative;height:150px;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:4px;align-items:end;border-bottom:1px solid var(--line)}
+.col{height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0}.col span{font-size:11px;font-weight:700;color:var(--mute);margin-bottom:3px;white-space:nowrap}.col i{display:block;width:min(100%,34px);border-radius:6px 6px 2px 2px;background:var(--c);opacity:.35;transition:height .7s cubic-bezier(.2,.8,.2,1)}
+.col.hl i{opacity:1}.col.hl span{color:var(--ink);font-weight:900}
+.cols-l{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:4px;margin-top:5px}.cols-l small{font-size:10px;color:var(--mute);text-align:center;white-space:nowrap;overflow:hidden}.cols-l small.hl{color:var(--ink);font-weight:800}
+.cols-g{position:absolute;left:0;right:0;border-top:2px dashed #16a34a;z-index:1;pointer-events:none}.cols-g span{position:absolute;left:0;top:-17px;font-size:10px;font-weight:800;color:#16a34a;background:var(--card);padding:0 3px}
+.kt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:4px 0 12px}.kt>div{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:11px 12px}.kt small{display:block;font-size:12px;color:var(--mute);font-weight:700}.kt b{display:block;font-size:22px;font-weight:900;letter-spacing:-.02em}.kt em{font-style:normal;font-size:12px;color:var(--mute)}
+.cgrid{display:grid;gap:12px}.cgrid>.tcard{margin:0}
+.sportseg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.sportseg button{flex-direction:column;gap:0;min-height:64px;border-radius:16px;background:var(--card);border:2px solid var(--line);font-weight:800}.sportseg button span{font-size:20px}.sportseg button small{font-size:11px;color:var(--mute);font-weight:600}
+.sportseg button.sel{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,var(--card));color:var(--c)}
+.recs{display:grid;gap:8px}.recrow{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:11px 14px}.recrow>span:first-child{font-size:22px}.recrow small{display:block;font-size:12px;color:var(--mute)}.recrow b{font-size:18px;font-weight:900}.recrow em{font-style:normal;font-size:12px;color:var(--mute);text-align:right}
+button.rmrow{all:unset;box-sizing:border-box;cursor:pointer;width:100%}
+.calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}.calg>small{font-size:11px;font-weight:800;color:var(--mute);padding-bottom:2px}
+.cday{all:unset;box-sizing:border-box;cursor:pointer;aspect-ratio:1/1;border-radius:12px;background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}.cday b{font-size:14px}
+.cday.out{opacity:.35}.cday.today{border:2px solid var(--ink)}.cday.sel{background:var(--ink);color:var(--bg)}.cday.has:not(.sel){background:color-mix(in srgb,var(--acc) 8%,var(--card))}
+.cdots{display:flex;gap:3px;height:6px}.cdots i{width:6px;height:6px;border-radius:50%}.cico{display:none;font-size:14px;line-height:1}
+.legend{display:flex;gap:14px;justify-content:center;margin:8px 0 2px;font-size:12px;color:var(--mute)}.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.mtiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media(min-width:620px){.jgrid2{grid-template-columns:repeat(2,minmax(0,1fr))}.jgrid2 .weekcard,.jgrid2 .lastact{grid-column:span 1}.kt{grid-template-columns:repeat(4,minmax(0,1fr))}.mtiles{grid-template-columns:repeat(4,minmax(0,1fr))}.cgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.cols-a{height:180px}}
+@media(min-width:1100px){body[data-view=progress] #app{max-width:1100px}.jgrid2{grid-template-columns:repeat(3,minmax(0,1fr))}.jgrid2 .weekcard{grid-column:span 2}.cday{aspect-ratio:auto;min-height:74px}.cday .cico{display:block}.cday .cdots{display:none}}

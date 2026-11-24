@@ -78,25 +78,65 @@ window.showChallenge = ch => {
 const chCard = () => { const ch = challenge(); return `<div class="chcard ${ch.done ? 'won' : ''}"><div class="ch-i">🎯</div><div class="ch-t"><small>Défi de ${ch.month} · J-${ch.left}</small><b>${esc(ch.n)}</b><div class="ch-bar"><i style="width:${ch.p * 100}%"></i></div><small>${fr(Math.min(ch.v, ch.g))}${ch.u} / ${fr(ch.g)}${ch.u}${ch.done ? ' · réussi !' : ''}</small></div></div>`; };
 
 /* ---------- sous-vues ---------- */
-let tab = 'resume', exOpen = null, calT = Date.now();
+let tab = 'resume', exOpen = null, calT = Date.now(), selDay = new Date().toDateString(), sport = null;
+const KIND = l => l.kind === 'run' ? 'run' : l.kind === 'bike' ? 'bike' : 'gym';
+const ICO = { gym: '🏋️', run: '🏃', bike: '🚴' }, COL = { gym: 'var(--acc)', run: '#2563eb', bike: '#16a34a' }, LBL = { gym: 'Muscu', run: 'Course', bike: 'Vélo' };
+const mm = s => { s = Math.round(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const hm = s => { const m = Math.round(s / 60); return m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') : m + ' min'; };
+const durS = l => l.sec || Math.max(60, (l.end - l.start) / 1000);
+const paceOf = l => l.pace || (l.km ? l.sec / l.km : 0), kmhOf = l => l.kmh || (l.sec ? l.km / (l.sec / 3600) : 0);
+const monday = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); };
+const allLog = () => C().S().log.slice().sort((a, b) => a.start - b.start);
+function actLine(l) {
+  const k = KIND(l);
+  if (k === 'run') return `${fr(l.km, 1)} km · ${mm(paceOf(l))}/km · ${hm(durS(l))}`;
+  if (k === 'bike') return `${fr(l.km, 1)} km · ${fr(kmhOf(l), 1)} km/h${l.elev ? ' · ' + l.elev + ' m D+' : ''}`;
+  return `${(l.ex || []).reduce((a, e) => a + e.sets.length, 0)} séries · ${fr(l.vol || 0)} kg · ${mmin(l)} min${(l.prs || []).length ? ' · ' + l.prs.length + ' PR' : ''}`;
+}
+const actRow = l => `<button class="arow" data-jr="detail" data-v="${esc(l.id)}"><span class="a-ic" style="--c:${COL[KIND(l)]}">${ICO[KIND(l)]}</span><span class="a-t"><b>${esc(l.name)}</b><small>${new Date(l.start).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · ${actLine(l)}</small></span><span class="mer-go">›</span></button>`;
+/* graphique en colonnes (HTML, lisible sur téléphone) */
+function cols(vals, labels, o = {}) {
+  const ok = vals.filter(v => v != null && v > 0), n = vals.length;
+  if (!ok.length) return `<p class="tiny">${o.empty || 'Pas encore de données.'}</p>`;
+  const lo = o.invert ? (o.lo ?? Math.min(...ok, o.goal ?? Infinity) - 15) : 0, hi = o.invert ? (o.hi ?? Math.max(...ok) + 10) : (o.hi ?? Math.max(...ok, o.goal || 0) * 1.12);
+  const pc = v => Math.max(3, Math.min(100, o.invert ? (hi - v) / (hi - lo) * 100 : v / hi * 100));
+  const hl = o.hl ?? n - 1, fmt = o.fmt || (v => fr(v));
+  return `<div class="cols" style="--n:${n}"><div class="cols-a">${o.goal != null ? `<div class="cols-g" style="bottom:${pc(o.goal)}%"><span>${esc(o.goalLbl || fmt(o.goal))}</span></div>` : ''}
+    ${vals.map((v, i) => `<div class="col ${i === hl ? 'hl' : ''}" title="${esc(labels[i])} : ${v == null || !v ? '—' : esc(fmt(v))}"><span>${v == null || !v ? '' : fmt(v)}</span><i style="height:${v == null || !v ? 0 : pc(v)}%;--c:${o.color || 'var(--acc)'}"></i></div>`).join('')}</div>
+    <div class="cols-l">${labels.map((l, i) => `<small class="${i === hl ? 'hl' : ''}">${esc(l)}</small>`).join('')}</div></div>`;
+}
+const weeksBack = n => Array.from({ length: n }, (_, i) => monday(Date.now()) - (n - 1 - i) * 7 * 864e5);
+const monthsBack = n => { const now = new Date(); return Array.from({ length: n }, (_, i) => new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1)); };
+const inWeek = (l, w) => l.start >= w && l.start < w + 7 * 864e5;
+const inMonth = (l, m) => { const d = new Date(l.start); return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear(); };
+const wLbl = w => { const d = new Date(w); return d.getDate() + '/' + (d.getMonth() + 1); }, mLbl = m => MONTHS[m.getMonth()].slice(0, 3) + '.';
+
 function vResume() {
-  const L = gym(), last = L.at(-1), st = stats(), now = Date.now(), mk = monthKey(now), ML = L.filter(s => monthKey(s.start) === mk);
-  const mVol = ML.reduce((a, s) => a + (s.vol || 0), 0), mPr = ML.reduce((a, s) => a + (s.prs || []).length, 0), yPr = L.filter(s => new Date(s.start).getFullYear() === new Date().getFullYear()).reduce((a, s) => a + (s.prs || []).length, 0);
-  const w = C().body(), ws = C().S().body.weights || [], nextP = (window.VIEWS.nextPlanned && window.VIEWS.nextPlanned()) || null;
-  return `${last ? `<div class="lastcard"><div class="lc-date"><small>${new Date(last.start).toLocaleDateString('fr-FR', { weekday: 'short' })}</small><b>${new Date(last.start).getDate()}</b><small>${new Date(last.start).toLocaleDateString('fr-FR', { month: 'short' })}</small></div>
-      <div class="lc-t"><small>Ta dernière séance</small><b>${esc(last.name)}</b><div class="chipsrow"><span>${(last.ex || []).reduce((a, e) => a + e.sets.length, 0)} séries</span><span>${fr(last.vol || 0)} kg</span><span>${mmin(last)} min</span>${last.feel ? `<span>${esc(last.feel)}</span>` : ''}</div></div>
-      <div class="lc-b"><button class="sm p" data-jr="detail" data-v="${esc(last.id)}">Le détail</button>${last.sid ? `<button class="sm" data-act="start" data-sid="${esc(last.sid)}">Refaire</button>` : ''}</div></div>` : `<div class="tcard"><p>Ton journal se remplit tout seul en mode salle. Lance ta première séance depuis Mes séances.</p><button class="p wide" data-act="goto" data-v="program">Mes séances</button></div>`}
-  <div class="jgrid">
-    <div class="tcard"><div class="eyebrow">Ce mois-ci</div><div class="trio3"><div class="mini"><b>${ML.length}</b><small>séance${ML.length > 1 ? 's' : ''}</small></div><div class="mini"><b>${fr(mVol)}</b><small>kg soulevés</small></div><div class="mini"><b>${mPr}</b><small>record${mPr > 1 ? 's' : ''}</small></div></div>
-      <div class="row" style="margin-top:10px"><button class="story grow" data-jr="story">Partager en story</button></div></div>
-    <div class="tcard"><div class="eyebrow">Défi</div>${chCard()}</div>
-    <div class="tcard"><div class="eyebrow">Mon corps</div><b class="big2">${fk(w.w)} kg</b><p class="tiny">${ws.length ? 'Pesée du ' + dS(ws.at(-1).t) : 'Note ton poids'}</p><button class="sm" data-act="goto" data-v="me">Noter mon poids</button></div>
-    <div class="tcard"><div class="eyebrow">Records en ${new Date().getFullYear()}</div><b class="big2">${yPr} PR</b><p class="tiny">${st.prs} au total</p><button class="sm" data-jr="tab" data-v="chiffres">Mes records</button></div>
+  const L = allLog(), w0 = monday(Date.now()), W = L.filter(l => inWeek(l, w0)), st = stats(), last = L.at(-1);
+  const gW = W.filter(l => KIND(l) === 'gym').length, rW = W.filter(l => KIND(l) === 'run').reduce((a, l) => a + l.km, 0), bW = W.filter(l => KIND(l) === 'bike').reduce((a, l) => a + l.km, 0), tW = W.reduce((a, l) => a + durS(l), 0);
+  const days = Array.from({ length: 7 }, (_, i) => w0 + i * 864e5), today = new Date().toDateString();
+  const strip = days.map((d, i) => { const ds = new Date(d).toDateString(), A = L.filter(l => new Date(l.start).toDateString() === ds); return `<div class="wd ${ds === today ? 'today' : ''} ${A.length ? 'on' : ''}"><small>${'LMMJVSD'[i]}</small><span>${A.length ? [...new Set(A.map(KIND))].map(k => ICO[k]).join('') : new Date(d).getDate()}</span></div>`; }).join('');
+  const runs = L.filter(l => KIND(l) === 'run' && l.km >= 3).slice(-5), avgP = runs.length ? runs.reduce((a, l) => a + paceOf(l), 0) / runs.length : 0;
+  const w = C().body(), ws = C().S().body.weights || [], nextP = (window.VIEWS.nextPlanned && window.VIEWS.nextPlanned()) || null, yPr = gym().filter(s => new Date(s.start).getFullYear() === new Date().getFullYear()).reduce((a, s) => a + (s.prs || []).length, 0);
+  const stag = window.PROG ? window.PROG.stagnantList() : [];
+  return `<div class="jgrid2">
+  <section class="tcard weekcard"><div class="between"><div class="eyebrow" style="margin:0">Cette semaine</div><small class="mute">${hm(tW)} de sport</small></div>
+    <div class="wkt">${[['gym', gW, gW > 1 ? 'séances' : 'séance'], ['run', fr(rW, 1), 'km'], ['bike', fr(bW, 0), 'km']].map(([k, v, u]) => `<div style="--c:${COL[k]}"><span>${ICO[k]}</span><b>${v}</b><small>${LBL[k]} · ${u}</small></div>`).join('')}</div>
+    <div class="wstrip">${strip}</div>
+    <p class="tiny" style="margin:8px 0 0">🔥 ${C().S().best ? stats().best : 0} semaine${(C().S().best || 0) > 1 ? 's' : ''} de suite au maximum · objectif ${C().S().set.goal} séance${C().S().set.goal > 1 ? 's' : ''} de muscu par semaine</p></section>
+  ${last ? `<section class="tcard lastact" style="--c:${COL[KIND(last)]}"><div class="eyebrow">Dernière activité</div><div class="la-h"><span class="a-ic big" style="--c:${COL[KIND(last)]}">${ICO[KIND(last)]}</span><div><b>${esc(last.name)}</b><small>${dL(last.start)}</small></div></div>
+    <div class="la-k">${KIND(last) === 'gym' ? `<div><b>${mmin(last)}</b><small>min</small></div><div><b>${(last.ex || []).reduce((a, e) => a + e.sets.length, 0)}</b><small>séries</small></div><div><b>${fr(last.vol || 0)}</b><small>kg</small></div>` : KIND(last) === 'run' ? `<div><b>${fr(last.km, 2)}</b><small>km</small></div><div><b>${mm(paceOf(last))}</b><small>/km</small></div><div><b>${hm(durS(last))}</b><small>durée</small></div>` : `<div><b>${fr(last.km, 1)}</b><small>km</small></div><div><b>${fr(kmhOf(last), 1)}</b><small>km/h</small></div><div><b>${last.elev || 0}</b><small>m D+</small></div>`}</div>
+    <div class="row"><button class="p sm grow" data-jr="detail" data-v="${esc(last.id)}">Voir l'analyse</button>${last.sid ? `<button class="sm grow" data-act="start" data-sid="${esc(last.sid)}">Refaire</button>` : ''}</div></section>` : `<section class="tcard"><p>Ton journal se remplit tout seul : séances du mode salle et sorties Strava.</p><button class="p wide" data-act="goto" data-v="program">Mes séances</button></section>`}
+  ${runs.length ? `<section class="tcard"><div class="eyebrow">Objectif 4:30/km</div><div class="between"><b class="big2">${mm(avgP)}<small style="font-size:14px">/km</small></b><span class="${avgP <= 270 ? 'okchip' : 'chip2'}">${avgP <= 270 ? 'Atteint !' : '+' + Math.round(avgP - 270) + ' s/km'}</span></div><div class="ch-bar" style="margin:8px 0"><i style="width:${Math.min(100, Math.max(5, (360 - avgP) / 90 * 100))}%;background:#2563eb"></i></div><p class="tiny">Allure moyenne de tes ${runs.length} dernières courses (6:00 → 4:30).</p></section>` : ''}
+  <section class="tcard"><div class="eyebrow">Défi du mois</div>${chCard()}</section>
+  <section class="tcard"><div class="eyebrow">Mon corps</div><b class="big2">${fk(w.w)} kg</b><p class="tiny">${ws.length ? 'Pesée du ' + dS(ws.at(-1).t) : 'Note ton poids'}</p><button class="sm" data-act="goto" data-v="me">Noter mon poids</button></section>
+  <section class="tcard"><div class="eyebrow">Records muscu ${new Date().getFullYear()}</div><b class="big2">${yPr} PR</b><p class="tiny">${st.prs} au total</p><button class="sm" data-jr="tab" data-v="chiffres">Mes chiffres</button></section>
   </div>
-  ${(() => { const L = window.PROG ? window.PROG.stagnantList() : []; return L.length ? `<div class="tcard stagcard"><div class="eyebrow">À surveiller</div>${L.slice(0, 3).map(x => `<p class="small"><b>${esc(C().metaOf(x.id).n || (C().S().log.flatMap(s => s.ex || []).find(e => e.id === x.id) || {}).n || x.id)}</b> : ${esc(x.s.msg)}</p>`).join('')}</div>` : ''; })()}
+  ${stag.length ? `<div class="tcard stagcard"><div class="eyebrow">À surveiller</div>${stag.slice(0, 3).map(x => `<p class="small"><b>${esc(C().metaOf(x.id).n || (C().S().log.flatMap(s => s.ex || []).find(e => e.id === x.id) || {}).n || x.id)}</b> : ${esc(x.s.msg)}</p>`).join('')}</div>` : ''}
   ${nextP ? `<div class="tcard nextp"><div class="eyebrow">Prévu ensuite</div><b>${esc(nextP.label)}</b><p class="tiny">${esc(nextP.name)}</p><button class="sm" data-act="goto" data-v="program">Mes séances</button></div>` : ''}
-  <div class="eyebrow" style="margin-top:18px">Séances de ${MONTHS[new Date().getMonth()]}</div>
-  <div class="tcard" style="padding:6px 14px">${ML.slice().reverse().map(s => `<button class="jrow" data-jr="detail" data-v="${esc(s.id)}"><span class="jd"><small>${new Date(s.start).toLocaleDateString('fr-FR', { weekday: 'short' })}</small><b>${new Date(s.start).getDate()}</b></span><span class="jt"><b>${esc(s.name)}</b><small>${(s.ex || []).length} exos · ${fr(s.vol || 0)} kg${(s.prs || []).length ? ' · ' + s.prs.length + ' PR' : ''}</small></span><span class="mer-go">›</span></button>`).join('') || '<p class="tiny">Aucune séance ce mois-ci.</p>'}</div>`;
+  <div class="between" style="margin-top:20px"><h2 class="h2t" style="margin:0">Activités récentes</h2><button class="link" data-jr="tab" data-v="cal">Calendrier ›</button></div>
+  <div class="tcard" style="padding:4px 14px">${L.slice(-12).reverse().map(actRow).join('') || '<p class="tiny">Aucune activité pour l\'instant.</p>'}</div>
+  <button class="story wide" style="margin-top:10px" data-jr="story">Partager mon mois en story</button>`;
 }
 function sessionSheet(id) {
   const l = C().S().log.find(x => x.id === id); if (!l) return;
@@ -114,7 +154,7 @@ function vExos() {
   if (exOpen) return vExo(exOpen);
   const REC = C().REC(), ids = [...new Set(gym().flatMap(s => (s.ex || []).map(e => e.id)))];
   const rows = ids.map(id => ({ id, h: exHist(id) })).sort((a, b) => b.h.at(-1).s.start - a.h.at(-1).s.start);
-  return rows.length ? `<div class="tcard" style="padding:4px 12px">${rows.map(({ id, h }) => { const R = REC.get(id), m = C().metaOf(id); return `<button class="exrow" data-jr="exo" data-v="${esc(id)}"><div class="mer-b">${window.bodySvg(m.m || 'Pecs', { one: true })}</div><div class="mer-t"><b>${esc(h.at(-1).e.n)}</b><small>${dS(h.at(-1).s.start)} · ${h.length} séance${h.length > 1 ? 's' : ''}${R ? ' · record ' + fk(R.kg) + ' kg × ' + (R.r || 1) : ''}</small></div>${spark(h.map(x => x.best.kg))}</button>`; }).join('')}</div>` : '<div class="tcard"><p class="tiny">Tes exercices apparaîtront ici après ta première séance.</p></div>';
+  return rows.length ? `<div class="tcard" style="padding:4px 12px">${rows.map(({ id, h }) => { const R = REC.get(id), m = C().metaOf(id); return `<button class="exrow" data-jr="exo" data-v="${esc(id)}"><div class="mer-b">${window.bodySvg(m.m || 'Pecs', { one: true })}</div><div class="mer-t"><b>${esc(h.at(-1).e.n)}</b><small>${dS(h.at(-1).s.start)} · ${h.length} séance${h.length > 1 ? 's' : ''}${R ? ' · record ' + fk(R.kg) + ' kg × ' + (R.r || 1) : ''}</small></div>${spark(h.map(x => x.best.kg))}</button>`; }).join('')}</div>` : `<div class="tcard"><p class="small">Ici, tu retrouveras chaque exercice de muscu que tu as fait, avec ta courbe de progression et ton record. Ça se remplit tout seul dès ta première séance en mode salle.</p><button class="p wide" data-act="goto" data-v="lib">Parcourir la bibliothèque d'exercices</button></div>`;
 }
 function vExo(id) {
   const h = exHist(id); if (!h.length) { exOpen = null; return vExos(); }
@@ -130,44 +170,68 @@ function vExo(id) {
 }
 function vCal() {
   const d = new Date(calT); d.setDate(1); const y = d.getFullYear(), m = d.getMonth(), start = new Date(d); start.setDate(1 - ((d.getDay() + 6) % 7));
-  const L = gym(), byDay = new Map(); for (const s of L) { const k = new Date(s.start).toDateString(); byDay.set(k, (byDay.get(k) || 0) + (s.vol || 1)); }
-  const mx = Math.max(1, ...byDay.values()), ML = L.filter(s => new Date(s.start).getMonth() === m && new Date(s.start).getFullYear() === y);
+  const L = allLog(), byDay = new Map(); for (const l of L) { const k = new Date(l.start).toDateString(); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(l); }
+  const ML = L.filter(l => new Date(l.start).getMonth() === m && new Date(l.start).getFullYear() === y);
   const cells = Array.from({ length: 42 }, (_, i) => { const t = new Date(start); t.setDate(start.getDate() + i); return t; }).filter((t, i) => i < 35 || t.getMonth() === m);
+  const sel = byDay.get(selDay) || [], today = new Date().toDateString();
+  const plans = window.VIEWS.plansOn ? window.VIEWS.plansOn(new Date(selDay).getTime()) : [];
   return `<div class="wnav"><button class="sm" data-jr="cprev" aria-label="Mois précédent">‹</button><b>${MONTHS[m]} ${y}</b><button class="sm" data-jr="cnext" aria-label="Mois suivant">›</button></div>
-  <div class="heat">${['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(x => `<small>${x}</small>`).join('')}${cells.map(t => { const v = byDay.get(t.toDateString()) || 0, today = t.toDateString() === new Date().toDateString(); return `<div class="hc ${t.getMonth() !== m ? 'out' : ''} ${today ? 'today' : ''}" style="--h:${v ? .25 + .75 * v / mx : 0}">${t.getDate()}</div>`; }).join('')}</div>
-  <div class="trio3" style="margin-top:12px"><div class="mini"><b>${ML.length}</b><small>séances</small></div><div class="mini"><b>${fr(ML.reduce((a, s) => a + (s.vol || 0), 0))}</b><small>kg</small></div><div class="mini"><b>${ML.reduce((a, s) => a + mmin(s), 0)}</b><small>minutes</small></div></div>`;
+  <div class="calg">${['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(x => `<small>${x}</small>`).join('')}${cells.map(t => { const A = byDay.get(t.toDateString()) || [], ks = [...new Set(A.map(KIND))]; return `<button class="cday ${t.getMonth() !== m ? 'out' : ''} ${t.toDateString() === today ? 'today' : ''} ${t.toDateString() === selDay ? 'sel' : ''} ${A.length ? 'has' : ''}" data-jr="day" data-v="${t.toDateString()}"><b>${t.getDate()}</b><span class="cdots">${ks.map(k => `<i style="background:${COL[k]}" title="${LBL[k]}"></i>`).join('')}</span><span class="cico">${ks.map(k => ICO[k]).join('')}</span></button>`; }).join('')}</div>
+  <div class="legend">${['gym', 'run', 'bike'].map(k => `<span><i style="background:${COL[k]}"></i>${LBL[k]}</span>`).join('')}</div>
+  <section class="tcard"><div class="eyebrow">${new Date(selDay).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+    ${sel.length ? sel.map(actRow).join('') : `<p class="tiny">${new Date(selDay) > new Date() ? 'Rien de fait ce jour-là pour l\'instant.' : 'Repos ce jour-là.'}</p>`}
+    ${plans.length ? `<p class="tiny" style="margin-top:8px">Prévu : ${plans.map(esc).join(', ')}</p>` : ''}</section>
+  <div class="eyebrow" style="margin-top:14px">Bilan de ${MONTHS[m]}</div>
+  <div class="mtiles">${[['gym', ML.filter(l => KIND(l) === 'gym').length, 'séances'], ['run', fr(ML.filter(l => KIND(l) === 'run').reduce((a, l) => a + l.km, 0), 1), 'km de course'], ['bike', fr(ML.filter(l => KIND(l) === 'bike').reduce((a, l) => a + l.km, 0), 0), 'km de vélo'], [null, hm(ML.reduce((a, l) => a + durS(l), 0)), 'de sport']].map(([k, v, u]) => `<div class="mini"><b>${k ? ICO[k] + ' ' : '⏱️ '}${v}</b><small>${u}</small></div>`).join('')}</div>`;
 }
-function bars(vals, labels, unit) { const mx = Math.max(1, ...vals); return `<div class="vbars">${vals.map((v, i) => `<div class="vb"><span class="vv">${v ? fr(v) : ''}</span><i style="--h:${v / mx}"></i><small>${labels[i]}</small></div>`).join('')}</div>`; }
-function cardio() {
-  const S = C().S(), runs = S.log.filter(l => l.kind === 'run' && l.pace).slice(-16), rides = S.log.filter(l => l.kind === 'bike' && l.km);
-  if (!runs.length && !rides.length) return `<h2 class="h2t">Cardio</h2><div class="tcard"><p class="tiny">Importe tes sorties Strava (Moi → Réglages → Importer) pour voir ta progression en course et à vélo ici.</p></div>`;
-  const ps = runs.map(r => r.pace), goal = 270, mn = Math.min(goal - 10, ...ps), mx = Math.max(...ps) + 10, W = 600, H = 190, px = 34, py = 18;
-  const X = i => px + (runs.length < 2 ? .5 : i / (runs.length - 1)) * (W - 2 * px), Y = v => py + (v - mn) / (mx - mn) * (H - 2 * py);
-  const mm = s => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
-  const last5 = ps.slice(-5), avg = last5.reduce((a, b) => a + b, 0) / last5.length, best10 = Math.min(...S.log.filter(l => l.kind === 'run' && l.km >= 9.9).map(l => l.sec), Infinity);
-  const months = Array.from({ length: 6 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 5 + i); return d; });
-  const kmM = months.map(m => rides.filter(r => new Date(r.start).getMonth() === m.getMonth() && new Date(r.start).getFullYear() === m.getFullYear()).reduce((a, r) => a + r.km, 0));
-  return `<h2 class="h2t">Course à pied</h2><p class="sub2">Ton allure sortie par sortie (Strava). Plus la courbe monte, plus tu vas vite. La ligne verte, c'est ton objectif 4:30/km.</p>
-  ${runs.length > 1 ? `<div class="tcard"><div class="trio3"><div class="mini"><b>${mm(avg)}</b><small>/km, 5 dernières</small></div><div class="mini"><b>${avg > goal ? '+' + Math.round(avg - goal) + ' s' : 'Atteint'}</b><small>vs 4:30/km</small></div><div class="mini"><b>${isFinite(best10) ? mm(best10) : '—'}</b><small>record 10 km</small></div></div>
-    <svg class="exchart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="${px}" x2="${W - px}" y1="${Y(goal)}" y2="${Y(goal)}" stroke="#16a34a" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke"/><path class="draw" d="${ps.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(p).toFixed(1)).join('')}" fill="none" stroke="var(--al)" stroke-width="3" vector-effect="non-scaling-stroke"/>${ps.map((p, i) => `<circle cx="${X(i)}" cy="${Y(p)}" r="4" fill="var(--al)" vector-effect="non-scaling-stroke"/>`).join('')}</svg>
-    <div class="between tiny"><span>${dS(runs[0].start)}</span><span>4:30 = ligne verte</span><span>${dS(runs.at(-1).start)}</span></div></div>` : ''}
-  ${rides.length ? `<h2 class="h2t">Vélo</h2><p class="sub2">${fr(rides.reduce((a, r) => a + r.km, 0))} km au total, ${fr(Math.max(...rides.map(r => r.km)), 1)} km pour ta plus longue sortie.</p>${bars(kmM.map(Math.round), months.map(m => MONTHS[m.getMonth()].slice(0, 4)), ' km')}` : ''}`;
+/* ---------- chiffres ---------- */
+function recRows(R) { return `<div class="recs">${R.filter(Boolean).map(([i, l, v, s, id]) => `<${id ? `button data-jr="detail" data-v="${esc(id)}"` : 'div'} class="recrow"><span>${i}</span><span><small>${l}</small><b>${v}</b></span><em>${s || ''}</em></${id ? 'button' : 'div'}>`).join('')}</div>`; }
+function vRun() {
+  const R = allLog().filter(l => KIND(l) === 'run' && l.km), W = weeksBack(12), M = monthsBack(8), now = new Date();
+  if (!R.length) return '<div class="tcard"><p class="tiny">Tes courses Strava apparaîtront ici une fois Strava connecté (Moi → Réglages).</p></div>';
+  const kmW = W.map(w => R.filter(l => inWeek(l, w)).reduce((a, l) => a + l.km, 0));
+  const pM = M.map(m => { const x = R.filter(l => inMonth(l, m) && l.km >= 3); return x.length ? x.reduce((a, l) => a + l.sec, 0) / x.reduce((a, l) => a + l.km, 0) : null; });
+  const thisM = R.filter(l => inMonth(l, now)), yr = R.filter(l => new Date(l.start).getFullYear() === now.getFullYear());
+  const last5 = R.filter(l => l.km >= 3).slice(-5), avg = last5.length ? last5.reduce((a, l) => a + paceOf(l), 0) / last5.length : 0;
+  const best = (f, min) => R.filter(l => l.km >= min).reduce((b, l) => !b || f(l) < f(b) ? l : b, null);
+  const fast5 = best(paceOf, 5), ten = best(l => l.sec, 9.9), longest = R.reduce((b, l) => !b || l.km > b.km ? l : b, null), climb = R.reduce((b, l) => !b || (l.elev || 0) > (b.elev || 0) ? l : b, null);
+  return `<div class="kt">${[['Ce mois-ci', fr(thisM.reduce((a, l) => a + l.km, 0), 1) + ' km', thisM.length + ' sortie' + (thisM.length > 1 ? 's' : '')], ['En ' + now.getFullYear(), fr(yr.reduce((a, l) => a + l.km, 0), 0) + ' km', yr.length + ' sorties'], ['Allure récente', mm(avg) + '/km', '5 dernières'], ['Vs 4:30/km', avg <= 270 ? 'Atteint' : '+' + Math.round(avg - 270) + ' s', 'à gagner par km']].map(([a, b, c]) => `<div><small>${a}</small><b>${b}</b><em>${c}</em></div>`).join('')}</div>
+  <div class="cgrid"><section class="tcard"><h2 class="h2s">Kilomètres par semaine</h2>${cols(kmW, W.map(wLbl), { fmt: v => fr(v, v < 10 ? 1 : 0), color: COL.run })}<p class="tiny">Les 12 dernières semaines. En foncé : cette semaine.</p></section>
+  <section class="tcard"><h2 class="h2s">Allure moyenne par mois</h2>${cols(pM, M.map(mLbl), { invert: true, fmt: mm, color: COL.run, goal: 270, goalLbl: '4:30', empty: 'Pas encore assez de courses.' })}<p class="tiny">Plus la barre est haute, plus tu étais rapide. La ligne verte, c'est ton objectif.</p></section></div>
+  <h2 class="h2t">Mes records de course</h2>${recRows([ten && ['🏁', 'Meilleur 10 km et plus', mm(ten.sec / ten.km * 10).replace(/^(\d+):/, (x, a) => a + ':'), dS(ten.start), ten.id], fast5 && ['⚡', 'Meilleure allure (5 km et plus)', mm(paceOf(fast5)) + '/km', fr(fast5.km, 1) + ' km · ' + dS(fast5.start), fast5.id], longest && ['📏', 'Plus longue sortie', fr(longest.km, 1) + ' km', dS(longest.start), longest.id], climb && climb.elev && ['⛰️', 'Plus de dénivelé', climb.elev + ' m D+', dS(climb.start), climb.id]])}
+  <h2 class="h2t">Dernières courses</h2><div class="tcard" style="padding:4px 14px">${R.slice(-6).reverse().map(actRow).join('')}</div>`;
+}
+function vBike() {
+  const R = allLog().filter(l => KIND(l) === 'bike' && l.km), W = weeksBack(12), M = monthsBack(8), now = new Date();
+  if (!R.length) return '<div class="tcard"><p class="tiny">Tes sorties vélo Strava apparaîtront ici une fois Strava connecté (Moi → Réglages).</p></div>';
+  const kmM = M.map(m => R.filter(l => inMonth(l, m)).reduce((a, l) => a + l.km, 0));
+  const vM = M.map(m => { const x = R.filter(l => inMonth(l, m)); return x.length ? x.reduce((a, l) => a + l.km, 0) / x.reduce((a, l) => a + l.sec, 0) * 3600 : null; });
+  const kmW = W.map(w => R.filter(l => inWeek(l, w)).reduce((a, l) => a + l.km, 0));
+  const thisM = R.filter(l => inMonth(l, now)), yr = R.filter(l => new Date(l.start).getFullYear() === now.getFullYear());
+  const top = f => R.reduce((b, l) => !b || f(l) > f(b) ? l : b, null), longest = top(l => l.km), climb = top(l => l.elev || 0), fast = R.filter(l => l.km >= 30).reduce((b, l) => !b || kmhOf(l) > kmhOf(b) ? l : b, null);
+  return `<div class="kt">${[['Ce mois-ci', fr(thisM.reduce((a, l) => a + l.km, 0), 0) + ' km', thisM.length + ' sortie' + (thisM.length > 1 ? 's' : '')], ['En ' + now.getFullYear(), fr(yr.reduce((a, l) => a + l.km, 0), 0) + ' km', fr(yr.reduce((a, l) => a + (l.elev || 0), 0), 0) + ' m D+'], ['Vitesse moy.', fr(R.slice(-5).reduce((a, l) => a + l.km, 0) / R.slice(-5).reduce((a, l) => a + l.sec, 0) * 3600, 1) + ' km/h', '5 dernières'], ['Sortie moyenne', fr(R.reduce((a, l) => a + l.km, 0) / R.length, 0) + ' km', R.length + ' sorties en tout']].map(([a, b, c]) => `<div><small>${a}</small><b>${b}</b><em>${c}</em></div>`).join('')}</div>
+  <div class="cgrid"><section class="tcard"><h2 class="h2s">Kilomètres par mois</h2>${cols(kmM, M.map(mLbl), { fmt: v => fr(v, 0), color: COL.bike })}<p class="tiny">Les 8 derniers mois. En foncé : ce mois-ci.</p></section>
+  <section class="tcard"><h2 class="h2s">Vitesse moyenne par mois</h2>${cols(vM, M.map(mLbl), { fmt: v => fr(v, 1), color: COL.bike, lo: 0, empty: 'Pas encore assez de sorties.' })}<p class="tiny">En km/h. Attention : le dénivelé fait baisser la moyenne.</p></section></div>
+  <section class="tcard"><h2 class="h2s">Kilomètres par semaine</h2>${cols(kmW, W.map(wLbl), { fmt: v => fr(v, 0), color: COL.bike })}</section>
+  <h2 class="h2t">Mes records vélo</h2>${recRows([longest && ['📏', 'Plus longue sortie', fr(longest.km, 1) + ' km', dS(longest.start), longest.id], climb && climb.elev && ['⛰️', 'Plus de dénivelé', climb.elev + ' m D+', fr(climb.km, 0) + ' km · ' + dS(climb.start), climb.id], fast && ['⚡', 'Plus rapide (30 km et plus)', fr(kmhOf(fast), 1) + ' km/h', fr(fast.km, 0) + ' km · ' + dS(fast.start), fast.id]])}
+  <h2 class="h2t">Dernières sorties</h2><div class="tcard" style="padding:4px 14px">${R.slice(-6).reverse().map(actRow).join('')}</div>`;
+}
+function vGym() {
+  const REC = C().REC(), bw = C().body().w, L = gym(), now = new Date(), st = stats(), W = weeksBack(12), M = monthsBack(6);
+  if (!L.length) return `<div class="tcard"><p class="small">Tes chiffres de muscu (séances par semaine, kilos soulevés, 1RM, records) apparaîtront ici après ta première séance en mode salle.</p><button class="p wide" data-act="goto" data-v="program">Lancer une séance</button></div>`;
+  const recs = [...REC.values()].sort((a, b) => b.e1 - a.e1), yr = L.filter(s => new Date(s.start).getFullYear() === now.getFullYear() && (s.prs || []).length);
+  return `<div class="kt">${[['Séances', st.n, 'au total'], ['Soulevé', fr(st.ton / 1000, 1) + ' t', 'au total'], ['Records', st.prs, 'battus'], ['Durée moy.', Math.round(L.reduce((a, s) => a + mmin(s), 0) / L.length) + ' min', 'par séance']].map(([a, b, c]) => `<div><small>${a}</small><b>${b}</b><em>${c}</em></div>`).join('')}</div>
+  <div class="cgrid"><section class="tcard"><h2 class="h2s">Séances par semaine</h2>${cols(W.map(w => L.filter(s => inWeek(s, w)).length), W.map(wLbl), { goal: C().S().set.goal, goalLbl: 'objectif', hi: Math.max(C().S().set.goal + 1, ...W.map(w => L.filter(s => inWeek(s, w)).length)) })}</section>
+  <section class="tcard"><h2 class="h2s">Kilos soulevés par mois</h2>${cols(M.map(m => L.filter(s => inMonth(s, m)).reduce((a, s) => a + (s.vol || 0), 0)), M.map(mLbl), { fmt: v => v >= 1000 ? fr(v / 1000, 1) + ' t' : fr(v) })}</section></div>
+  <h2 class="h2t">Mes 1RM estimés</h2><p class="sub2">Ta charge max sur une répétition, et ce qu'elle représente par rapport à ton poids (${fk(bw)} kg).</p>
+  <div class="tcard" style="padding:4px 12px">${recs.slice(0, 10).map(R => `<button class="rmrow" data-jr="exo" data-v="${esc(R.id || '')}"><span><b>${esc(R.n)}</b><small>record ${fk(R.kg)} kg × ${R.r || 1} · ${dS(R.t)}</small></span><span class="rmv"><b>${fk(R.e1)} kg</b><small>${fr(R.e1 / bw, 2)} × ton poids</small></span></button>`).join('') || '<p class="tiny">Pas encore de record.</p>'}</div>
+  <h2 class="h2t">Mes PR de l'année</h2><div class="frise">${yr.slice().reverse().map(s => `<div class="fr-i"><i></i><small>${dS(s.start)}</small><b>${s.prs.map(esc).join(', ')}</b></div>`).join('') || '<p class="tiny">Aucun record cette année pour l\'instant.</p>'}</div>`;
 }
 function vChiffres() {
-  const REC = C().REC(), bw = C().body().w, L = gym(), now = new Date(), st = stats();
-  const recs = [...REC.values()].sort((a, b) => b.e1 - a.e1);
-  const weeks = Array.from({ length: 10 }, (_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - (9 - i) * 7); return d.getTime(); });
-  const perW = weeks.map((w, i) => L.filter(s => s.start >= w && s.start < (weeks[i + 1] || Infinity)).length);
-  const months = Array.from({ length: 6 }, (_, i) => new Date(now.getFullYear(), now.getMonth() - 5 + i, 1));
-  const perM = months.map(m => L.filter(s => new Date(s.start).getMonth() === m.getMonth() && new Date(s.start).getFullYear() === m.getFullYear()).reduce((a, s) => a + (s.vol || 0), 0));
-  const yr = L.filter(s => new Date(s.start).getFullYear() === now.getFullYear() && (s.prs || []).length);
-  return `<div class="trio3"><div class="mini"><b>${st.n}</b><small>séances</small></div><div class="mini"><b>${fr(st.ton / 1000, 1)} t</b><small>soulevées</small></div><div class="mini"><b>${st.prs}</b><small>records</small></div></div>
-  <h2 class="h2t">Mes 1RM estimés</h2><p class="sub2">Ta charge max sur une répétition, et ce qu'elle représente par rapport à ton poids (${fk(bw)} kg).</p>
-  <div class="tcard" style="padding:4px 12px">${recs.slice(0, 8).map(R => `<div class="rmrow"><span><b>${esc(R.n)}</b><small>record ${fk(R.kg)} kg × ${R.r || 1} · ${dS(R.t)}</small></span><span class="rmv"><b>${fk(R.e1)} kg</b><small>${fr(R.e1 / bw, 2)} × ton poids</small></span></div>`).join('') || '<p class="tiny">Pas encore de record.</p>'}</div>
-  ${cardio()}
-  <h2 class="h2t">Séances par semaine</h2>${bars(perW, weeks.map(w => new Date(w).getDate() + '/' + (new Date(w).getMonth() + 1)), '')}
-  <h2 class="h2t">Kilos soulevés par mois</h2>${bars(perM.map(Math.round), months.map(m => MONTHS[m.getMonth()].slice(0, 4)), ' kg')}
-  <h2 class="h2t">Mes PR de l'année</h2><div class="frise">${yr.slice().reverse().map(s => `<div class="fr-i"><i></i><small>${dS(s.start)}</small><b>${s.prs.map(esc).join(', ')}</b></div>`).join('') || '<p class="tiny">Aucun record cette année pour l\'instant.</p>'}</div>`;
+  const L = allLog(); if (!sport) { const l = L.at(-1); sport = l ? KIND(l) : 'gym'; }
+  const n = k => L.filter(l => KIND(l) === k).length;
+  return `<div class="sportseg">${['run', 'bike', 'gym'].map(k => `<button class="${sport === k ? 'sel' : ''}" style="--c:${COL[k]}" data-jr="sport" data-v="${k}"><span>${ICO[k]}</span>${LBL[k]}<small>${n(k)}</small></button>`).join('')}</div>
+  ${{ run: vRun, bike: vBike, gym: vGym }[sport]()}`;
 }
 function vBadges() {
   const st = stats(), S = C().S(), fams = [...new Set(window.BADGES2.map(b => b.f))], won = window.BADGES2.filter(b => S.badges[b.id]).length;
@@ -206,8 +270,10 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-jr]'); if (!b || !window.CARNET) return; const v = b.dataset.v;
   switch (b.dataset.jr) {
     case 'tab': tab = v; exOpen = null; C().go('progress'); return;
-    case 'detail': if (window.DESK && window.DESK.isDesk()) { window.DESK.openAna(v); return; } sessionSheet(v); return;
-    case 'exo': exOpen = v; window.scrollTo(0, 0); break;
+    case 'detail': if (window.DESK) { window.DESK.openAna(v, 'progress'); return; } sessionSheet(v); return;
+    case 'day': selDay = v; break;
+    case 'sport': sport = v; break;
+    case 'exo': if (!v) return; if (tab !== 'exos') tab = 'exos'; exOpen = v; window.scrollTo(0, 0); break;
     case 'back': exOpen = null; break;
     case 'cprev': { const d = new Date(calT); d.setMonth(d.getMonth() - 1); calT = d.getTime(); break; }
     case 'cnext': { const d = new Date(calT); d.setMonth(d.getMonth() + 1); calT = d.getTime(); break; }

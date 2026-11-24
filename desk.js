@@ -18,7 +18,7 @@ const EQ_ICON = { M: '⚙️', S: '🏗️', P: '🪢', H: '🏋️', B: '➖', 
 const isDesk = () => matchMedia('(min-width: 1100px)').matches;
 const ME = 'Profil : homme, 1,76 m, 67 kg, étudiant ingénieur. Objectif : être sec et musclé pour l\'été, courir à 4:30/km, vélo de route. Muscu surtout sur machines guidées à la salle On Air Bordeaux Bastide, seul, donc priorité à la sécurité.';
 
-let libM = '', libE = '', libQ = '', libPick = null, exoId = null, anaId = null, progSel = null;
+let libM = '', libE = '', libQ = '', libPick = null, exoId = null, anaId = null, progSel = null, anaFrom = null;
 const urls = [];
 const freeUrls = () => { while (urls.length) URL.revokeObjectURL(urls.pop()); };
 const all = () => [...C().allEx().values()];
@@ -275,7 +275,7 @@ VIEWS.ana = () => {
   const kindIcon = x => x.kind === 'run' ? '🏃' : x.kind === 'bike' ? '🚴' : '🏋️';
   const side = `<aside class="toc"><div class="toc-in"><b>Mes activités</b><div class="alist">${L.slice(0, 40).map(x => `<button class="${l && x.id === l.id ? 'on' : ''}" data-lib="ana" data-id="${esc(x.id)}"><span>${kindIcon(x)}</span><span><b>${esc(x.name)}</b><small>${dS(x.start)}${x.km ? ' · ' + fr(x.km, 1) + ' km' : x.vol ? ' · ' + fr(x.vol) + ' kg' : ''}</small></span></button>`).join('') || '<p class="tiny">Aucune activité.</p>'}</div></div></aside>`;
   if (!l) return `<div class="lhero slim"><div><div class="kicker">Analyses</div><h1 class="bigt">Choisis une activité</h1><p class="mute">Séances de muscu, courses et sorties vélo : chaque activité a son analyse détaillée.</p></div></div><div class="exo-cols"><div class="exo-main">${L.slice(0, 9).map(x => `<button class="acard" data-lib="ana" data-id="${esc(x.id)}"><span>${kindIcon(x)}</span><span><b>${esc(x.name)}</b><small>${dL(x.start)}</small></span><em>${x.km ? fr(x.km, 1) + ' km' : fr(x.vol || 0) + ' kg'}</em></button>`).join('')}</div>${side}</div>`;
-  return `<nav class="crumb"><button data-lib="ana" data-id="">Analyses</button><span>›</span><b>${esc(l.name)}</b></nav>
+  return `<nav class="crumb">${anaFrom === 'progress' ? '<button data-act="goto" data-v="progress">← Journal</button><span>·</span>' : ''}<button data-lib="ana" data-id="">Analyses</button><span>›</span><b>${esc(l.name)}</b></nav>
     <div class="lhero slim"><div><div class="kicker">${kindIcon(l)} ${esc(dL(l.start))}</div><h1 class="bigt">${esc(l.name)}</h1></div>${l.sid ? `<button class="p" data-act="start" data-sid="${esc(l.sid)}">Refaire cette séance</button>` : l.src === 'strava' ? `<a class="btn" href="https://www.strava.com/activities/${esc(String(l.id).replace('strava_', ''))}" target="_blank" rel="noopener">Voir sur Strava</a>` : ''}</div>
     <div class="exo-cols"><div class="exo-main">${l.kind === 'run' || l.kind === 'bike' ? anaCardio(l) : anaGym(l)}</div>${side}</div>`;
 };
@@ -311,7 +311,7 @@ document.addEventListener('click', ev => {
     case 'pickdone': { const s = S.program[libPick]; libPick = null; C().go('progs'); if (s) setTimeout(() => document.getElementById('pg-' + s.id)?.scrollIntoView(), 50); return; }
     case 'ask': askClaude(exPrompt(id, b.dataset.v)); return;
     case 'askfree': { const q = (document.getElementById('exask').value || '').trim(); if (!q) { C().toast('Écris ta question'); return; } askClaude(exPrompt(id, q)); return; }
-    case 'ana': anaId = id || null; C().go('ana'); return;
+    case 'ana': anaId = id || null; if (!id) anaFrom = null; C().go('ana'); return;
     case 'anaask': askClaude(window.__anaPrompt || ''); return;
     case 'anaaskq': { const q = (document.getElementById('anaq').value || '').trim(); if (!q) { C().toast('Écris ta question'); return; } askClaude((window.__anaPrompt || '').replace(/\n\n[^\n]*$/, '') + '\n\nMa question : ' + q + '\nRéponds en français, tutoie-moi.'); return; }
   }
@@ -346,5 +346,5 @@ document.addEventListener('drop', ev => {
 document.addEventListener('dragend', () => { drag = null; for (const x of document.querySelectorAll('.dragging,.dropover')) x.classList.remove('dragging', 'dropover'); });
 
 document.addEventListener('click', ev => { const nb = ev.target.closest('#nav button'); if (!nb) return; const v = nb.dataset.view; if (v === 'ana') anaId = null; if (v === 'lib') { libM = ''; libE = ''; libQ = ''; } if (v === 'progs') libPick = null; }, true);
-window.DESK = { isDesk, openEx: id => { exoId = id; C().go('exo'); }, openAna: id => { anaId = id; C().go('ana'); } };
+window.DESK = { isDesk, openEx: id => { exoId = id; C().go('exo'); }, openAna: (id, from) => { anaId = id; anaFrom = from || null; C().go('ana'); } };
 }
