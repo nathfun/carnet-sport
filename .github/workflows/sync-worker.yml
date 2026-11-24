@@ -34,7 +34,17 @@ jobs:
       - name: Déployer
         run: wrangler deploy
       - name: Clé de synchro
-        run: printf '%s' "${{ secrets.SYNC_KEY }}" | wrangler secret put SYNC_KEY
+        env: { SK: "${{ secrets.SYNC_KEY }}" }
+        run: printf '%s' "$SK" | wrangler secret put SYNC_KEY
+      - name: Clés Strava (facultatif)
+        env:
+          SID: ${{ secrets.STRAVA_CLIENT_ID }}
+          SSEC: ${{ secrets.STRAVA_CLIENT_SECRET }}
+        run: |
+          if [ -n "$SID" ] && [ -n "$SSEC" ]; then
+            printf '%s' "$SID" | wrangler secret put STRAVA_CLIENT_ID
+            printf '%s' "$SSEC" | wrangler secret put STRAVA_CLIENT_SECRET
+          else echo "Pas de clés Strava : étape ignorée"; fi
       - name: Adresse du serveur
         run: |
           SUB=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain')

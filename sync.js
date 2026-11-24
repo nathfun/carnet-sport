@@ -110,6 +110,7 @@ async function run(opts = {}) {
   busy = true; clearTimeout(timer); setStatus('Synchro…');
   try {
     const S = C().S(); track(S);
+    if (cfg.strava) { try { const q = await api('/strava/pull' + (opts.loud ? '?force=1' : ''), { method: 'POST' }); if (q.ok) { const j = await q.json(); if (j.added > 0) cfg.stravaNew = j.added; } } catch (_) { } }
     let r = await (await api('/state')).json();
     if (r.data && !cfg.rev && !opts.choice) { busy = false; setStatus(''); return firstChoice(); }
     if (opts.choice === 'mine') { const now = Date.now(); for (const k of Object.keys(S)) if (!LOCAL.has(k)) S._mt[k] = now; }
@@ -129,7 +130,8 @@ async function run(opts = {}) {
     cfg.last = Date.now(); saveCfg();
     setStatus('✓ Synchronisé' + (m.down ? ` · ${m.down} média(s) reçu(s)` : '') + (m.up ? ` · ${m.up} envoyé(s)` : '') + (m.skipped ? ` · ${m.skipped} vidéo(s) trop lourde(s)` : ''));
     if (C().S().draft == null || document.body.dataset.view !== 'workout') C().render();
-    if (opts.loud) C().toast('Synchronisé ✓');
+    if (cfg.stravaNew) { C().toast(cfg.stravaNew + ' sortie(s) Strava ajoutée(s)'); cfg.stravaNew = 0; saveCfg(); }
+    else if (opts.loud) C().toast('Synchronisé ✓');
   } catch (e) {
     setStatus(e.message === 'cle' ? '✕ Clé refusée par le serveur' : '✕ Pas de connexion au serveur');
     if (opts.loud) C().toast(e.message === 'cle' ? 'Clé de synchro refusée' : 'Serveur de synchro injoignable');
@@ -156,7 +158,18 @@ function html() {
   <div class="row" style="margin-top:8px"><button class="sm" data-sync="gen">Créer une clé</button><button class="sm" data-sync="show">Afficher / masquer</button></div>
   <button class="p wide" style="margin-top:10px" data-sync="save">${on() ? 'Synchroniser maintenant' : 'Activer la synchro'}</button>
   <p class="tiny" id="syncst" style="margin-top:6px">${status || (on() ? lastTxt() : 'Synchro désactivée')}</p>
-  ${on() ? '<button class="ghost wide sm" data-sync="off">Désactiver sur cet appareil</button>' : ''}`;
+  ${on() ? '<button class="ghost wide sm" data-sync="off">Désactiver sur cet appareil</button>' : ''}
+  ${on() ? `<div class="sec">Strava</div><p class="tiny" id="stravast">Vérification…</p><div id="stravabtn"></div>` : ''}`;
+}
+async function stravaBox() {
+  const st = document.getElementById('stravast'), bx = document.getElementById('stravabtn'); if (!st || !on()) return;
+  try {
+    const s = await (await api('/strava/status')).json();
+    if (!s.configured) { st.textContent = "Strava n'est pas encore branché sur ton serveur (clés à ajouter dans GitHub)."; bx.innerHTML = ''; return; }
+    if (cfg.strava !== s.connected) { cfg.strava = s.connected; saveCfg(); }
+    st.textContent = s.connected ? `Connecté${s.name.trim() ? ' (' + s.name.trim() + ')' : ''}. Tes courses et sorties vélo arrivent toutes seules.` : 'Connecte ton compte : tes courses et sorties vélo arriveront toutes seules dans l\'app, même app fermée.';
+    bx.innerHTML = s.connected ? '<div class="row"><button class="sm" data-sync="spull">Récupérer maintenant</button><button class="sm ghost" data-sync="sunlink">Déconnecter</button></div>' : '<button class="wide" style="background:#fc4c02;color:#fff;border:0" data-sync="slink">Connecter Strava</button>';
+  } catch (e) { st.textContent = 'Serveur injoignable pour le moment.'; }
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-sync]'); if (!b) return; const a = b.dataset.sync;
@@ -171,6 +184,9 @@ document.addEventListener('click', async e => {
     await run({ loud: true });
   }
   else if (a === 'off') { cfg = {}; saveCfg(); C().toast('Synchro désactivée sur cet appareil'); C().render(); }
+  else if (a === 'slink') { try { const j = await (await api('/strava/link', { method: 'POST' })).json(); if (j.url) location.href = j.url; else C().toast(j.error || 'Erreur'); } catch (_) { C().toast('Serveur injoignable'); } }
+  else if (a === 'spull') { cfg.strava = true; saveCfg(); await run({ loud: true }); stravaBox(); }
+  else if (a === 'sunlink') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Sûr ?'; return; } await api('/strava/unlink', { method: 'POST' }).catch(() => { }); cfg.strava = false; saveCfg(); C().toast('Strava déconnecté'); stravaBox(); }
   else if (a === 'mine' || a === 'theirs') { C().closeSheet(); await run({ choice: a, loud: true }); }
 });
 
@@ -178,6 +194,8 @@ document.addEventListener('click', async e => {
 addEventListener('online', () => run());
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') run(); else if (dirty) run(); });
 setTimeout(() => run(), 1500);
+new MutationObserver(() => { const st = document.getElementById('stravast'); if (st && !st.dataset.done) { st.dataset.done = 1; stravaBox(); } }).observe(document.body, { childList: true, subtree: true });
+if (/[?&]strava=/.test(location.search)) history.replaceState(null, '', location.pathname);
 
 window.SYNC = { track, run, html, on, uid, tomb: u => { const S = C() && C().S(); if (S && u) { S._mdel = S._mdel || []; if (!S._mdel.includes(u)) S._mdel.push(u); dirty = true; C().save(); } } };
 })();
