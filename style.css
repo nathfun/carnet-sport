@@ -559,3 +559,10 @@ body[data-view=workout] .gm-in .gbody{--body:#e3e5ea;--mz:#cdd1d8;--hot:#e8461b}
 .ba-h{position:absolute;top:50%;left:var(--x);width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:none}
 .bph{display:flex;gap:8px;overflow-x:auto;padding:4px 0}.bph figure{position:relative;margin:0;flex:none}.bph img{width:82px;height:110px;object-fit:cover;border-radius:10px;display:block;cursor:pointer;border:2px solid transparent}.bph figure.sel img{border-color:var(--acc)}
 .bph figcaption{font-size:11px;color:var(--mute);text-align:center}.bph button{position:absolute;top:4px;right:4px;min-height:24px;width:24px;padding:0;font-size:11px;border-radius:7px;background:rgba(0,0,0,.6);color:#fff;border:0}
+.gmedia{height:240px}
+.gm-in.gm-empty{padding:12px}
+.gm-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;height:100%;border:2px dashed #cfd3da;border-radius:14px;color:#6b7280;font-size:14px;font-weight:700;cursor:pointer;text-align:center}
+.gm-add span{font-size:28px;line-height:1;color:var(--acc)}
+.gmuscle{display:flex;align-items:center;gap:14px;margin-top:14px;padding:10px 14px;border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
+.gmuscle .gbody{height:110px;width:auto;flex:none;--body:#3a3f4a;--mz:#2c3039;--hot:#e8461b}
+.gmuscle small{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;opacity:.6}.gmuscle b{font-size:18px}

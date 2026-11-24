@@ -149,8 +149,9 @@ const demoBlock = (id, q, label) => `<details data-mfor="${esc(id)}" ${S.guides[
   <div class="row"><label class="btn sm">Ajouter photo, GIF ou vidéo<input type="file" accept="image/*,video/*" multiple hidden data-add="${esc(id)}"></label><a class="btn sm" href="${yt(q)}" target="_blank" rel="noopener">Vidéos YouTube</a></div></details>`;
 const TECH = ['Dégressive', 'Partielles', 'Tempo', 'Unilatéral', 'Forcées', 'Négatives', 'Explosives', 'Pause', 'Rest-pause', 'Isométrie'];
 let techOpen = false, helpOpen = false, mediaHidden = false;
-function gymMedia(e) { return `<div class="gmedia ${mediaHidden ? 'hid' : ''}"><div class="gm-in" data-gm="${esc(e.id)}">${window.bodySvg(metaOf(e.id).m || 'Pecs', { cls: 'gbody' })}</div><button class="gm-hide" data-act="hidemedia">${mediaHidden ? 'Afficher' : 'Masquer'}</button></div>`; }
-async function fillGymMedia(id) { await idbReady; const box = document.querySelector(`[data-gm="${CSS.escape(id)}"]`); if (!box) return; const list = await mediaFor(id); if (!list.length) return; const m = list[0], u = URL.createObjectURL(m.blob); objUrls.push(u); box.innerHTML = String(m.type).startsWith('video') ? `<video src="${u}" muted loop playsinline autoplay></video>` : `<img src="${u}" alt="${esc(allEx().get(id)?.n || '')}">`; box.classList.add('photo'); }
+function gymMedia(e) { return `<div class="gmedia ${mediaHidden ? 'hid' : ''}"><div class="gm-in gm-empty" data-gm="${esc(e.id)}"><label class="gm-add"><span>＋</span>Ajouter un GIF ou une photo<input type="file" accept="image/*,video/*" hidden data-add="${esc(e.id)}"></label></div><button class="gm-hide" data-act="hidemedia">${mediaHidden ? 'Afficher' : 'Masquer'}</button></div>`; }
+function gymMuscle(e) { const m = metaOf(e.id).m; return m ? `<div class="gmuscle">${window.bodySvg(m, { cls: 'gbody' })}<div><small>Zone travaillée</small><b>${esc(m)}</b></div></div>` : ''; }
+async function fillGymMedia(id) { await idbReady; const box = document.querySelector(`[data-gm="${CSS.escape(id)}"]`); if (!box) return; const list = await mediaFor(id); if (!list.length) return; const m = list[0], u = URL.createObjectURL(m.blob); objUrls.push(u); box.innerHTML = String(m.type).startsWith('video') ? `<video src="${u}" muted loop playsinline autoplay></video>` : `<img src="${u}" alt="${esc(allEx().get(id)?.n || '')}">`; box.classList.add('photo'); box.classList.remove('gm-empty'); }
 function vWorkout() {
   const D = S.draft;
   if (!D) return `<div class="kicker">Mode salle</div><h1>Séance</h1><div class="card"><p>Aucune séance en cours.</p><button class="p wide" data-act="goto" data-v="program">Choisir une séance</button></div>`;
@@ -166,7 +167,7 @@ function vWorkout() {
   <div class="gcard-in" data-swipe>
     ${gymMedia(e)}
     ${e.ss ? '<div class="sstag">Superset</div>' : ''}<h2 class="gex">${esc(e.n)}</h2>
-    <p class="gsub">${e.sets.length} séries × ${esc(e.reps)} répétitions · repos ${e.rest} s${meta.m ? ' · ' + esc(meta.m) : ''}</p>
+    <p class="gsub">${e.sets.length} séries × ${esc(e.reps)} répétitions · repos ${e.rest} s</p>
     ${e.sets.some(x => x.deload) ? '<div class="gmsg deload">🧘 Semaine de décharge : charges à 60 %, une série en moins. Technique parfaite, aucune série à l\'échec.</div>' : ''}
     ${e.prog ? `<div class="gmsg up">↑ ${esc(e.prog)}</div>` : ''}${e.stag ? `<div class="gmsg stag">⚠ ${esc(e.stag)}</div>` : ''}
     ${D.kind === 'pr' ? `<p class="prhint">${R ? `Record : <b>${R.kg} kg × ${R.r || 1}</b>. Séries E = échauffement, puis tente <b>${r25(R.kg + 2.5)} kg</b>.` : "Pas encore de record ici : monte par paliers jusqu'à une charge lourde pour 3 à 5 reps."}</p>` : ''}
@@ -185,6 +186,7 @@ function vWorkout() {
       <p class="tiny">ϟ sur une série : E échauffement, D dégressive, F échec.</p></div>
     <div class="row" style="margin-top:10px">${D.ex[D.cur + 1] ? `<button class="sm" data-act="superset">${e.ss && D.ex[D.cur + 1].ss === e.ss ? 'Défaire le superset' : 'Superset avec le suivant'}</button>` : ''}<button class="sm" data-act="skip">Passer cet exercice</button></div>
     ${D.cur === n - 1 ? `<div class="genergy"><b>Envie d'un peu d'énergie ?</b><small>Ajoute un peu de cardio à la fin</small><div class="row">${[['rameur', 'Rameur'], ['velosalle', 'Vélo'], ['tapisinc', 'Tapis incliné'], ['skierg', 'SkiErg']].map(([id, l]) => `<button class="sm" data-act="pickex" data-id="${id}" data-target="draft" data-si="">${l}</button>`).join('')}</div></div>` : ''}
+    ${gymMuscle(e)}
     <div style="margin-top:10px">${demoBlock(e.id, e.q, 'Guide, photos et vidéos')}</div>
   </div>${gymBottom(D)}</div>`;
 }
@@ -486,7 +488,7 @@ function settingsInner() {
   <button class="wide" data-ex="ics">Ajouter mes séances au calendrier iPhone</button>
   <div class="sec">Semaine de décharge</div><p class="tiny">Une semaine plus légère conseillée toutes les :</p>
   <div class="pills">${[6, 7, 8].map(n => `<button class="${(window.DELOAD ? window.DELOAD.cfg().every : 7) === n ? 'sel' : ''}" data-ex="deloadevery" data-v="${n}">${n} semaines</button>`).join('')}</div>
-  <div class="sec">Version</div><p class="tiny">Version 13 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
+  <div class="sec">Version</div><p class="tiny">Version 14 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
   <div class="sec">Sauvegarde</div>
   <p class="tiny">Tout est enregistré sur cet appareil (téléphone ou ordi), sans synchro automatique. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
@@ -602,7 +604,7 @@ document.addEventListener('input', ev => {
 });
 document.addEventListener('change', async ev => {
   const t = ev.target;
-  if (t.dataset.add && t.files.length) { await idbReady; for (const f of t.files) { if (f.size > 200e6) { toast('Vidéo trop lourde (max 200 Mo)'); continue; } await mediaTx(st => st.add({ ex: t.dataset.add, blob: f, type: f.type || '' })); } fillMedia(t.dataset.add); toast('Ajouté à cet exercice'); }
+  if (t.dataset.add && t.files.length) { await idbReady; for (const f of t.files) { if (f.size > 200e6) { toast('Vidéo trop lourde (max 200 Mo)'); continue; } await mediaTx(st => st.add({ ex: t.dataset.add, blob: f, type: f.type || '' })); } fillMedia(t.dataset.add); fillGymMedia(t.dataset.add); toast('Ajouté à cet exercice'); }
   else if (t.dataset.act === 'chartsel') { chartId = t.value; drawChart(); }
   else if (t.id === 'impf' && t.files[0]) {
     try { const v = JSON.parse(await t.files[0].text()); if (v.app !== 'carnet-sport' || !Array.isArray(v.log)) throw 0;
