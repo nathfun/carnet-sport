@@ -250,13 +250,18 @@ function anaCardio(l) {
     if (a) notes.push([l.kmh > a ? '📈' : '📉', `${l.kmh > a ? 'Plus rapide' : 'Plus lent'} que tes 5 dernières sorties (${fr(a, 1)} km/h).`]);
     if (l.elev && l.km) notes.push(['⛰️', `${Math.round(l.elev / l.km)} m de D+ par km${l.elev / l.km > 12 ? ' : une vraie sortie de grimpeur, Pogačar approuve.' : '.'}`]);
   }
-  const H = [...before.slice(-14), l].map(x => ({ s: x, v: run ? (x.pace || x.sec / x.km) : (x.kmh || x.km / (x.sec / 3600)) }));
-  const W = 640, Ht = 200, px = 40, py = 22, vs = H.map(h => h.v), mn = Math.min(...vs, run ? goal : Infinity) - 5, mx = Math.max(...vs) + 5;
-  const X = i => px + (H.length < 2 ? .5 : i / (H.length - 1)) * (W - 2 * px), Y = v => run ? py + (v - mn) / (mx - mn) * (Ht - 2 * py) : Ht - py - (v - mn) / (mx - mn) * (Ht - 2 * py);
-  const chart = H.length > 1 ? `<svg class="dchart" viewBox="0 0 ${W} ${Ht}">${run ? `<line x1="${px}" x2="${W - px}" y1="${Y(goal)}" y2="${Y(goal)}" stroke="#16a34a" stroke-width="2" stroke-dasharray="6 5"/><text x="${W - px}" y="${Y(goal) - 6}" text-anchor="end" font-size="12" fill="#16a34a">objectif 4:30</text>` : ''}<path class="draw" d="${vs.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join('')}" fill="none" stroke="var(--al, var(--acc))" stroke-width="3"/>${vs.map((v, i) => `<circle cx="${X(i)}" cy="${Y(v)}" r="${i === vs.length - 1 ? 7 : 4}" fill="${i === vs.length - 1 ? 'var(--acc)' : 'var(--al, var(--acc))'}"><title>${dS(H[i].s.start)} : ${run ? mmss(v) + '/km' : fr(v, 1) + ' km/h'}</title></circle>`).join('')}</svg><p class="tiny">${run ? 'Allure de tes dernières sorties (plus haut = plus rapide). Le gros point, c\'est celle-ci.' : 'Vitesse moyenne de tes dernières sorties. Le gros point, c\'est celle-ci.'}</p>` : '';
+  const H = [...before.slice(-11), l], vals = H.map(x => run ? (x.pace || x.sec / x.km) : (x.kmh || x.km / (x.sec / 3600)));
+  const W = 900, Ht = 240, L = 50, R = 14, T = 26, B = 40, cw = (W - L - R) / H.length, bw = Math.min(46, cw * .62);
+  const lo = run ? Math.min(...vals, goal) - 15 : 0, hi = run ? Math.max(...vals) + 10 : Math.max(...vals) * 1.15;
+  const bh = v => run ? (hi - v) / (hi - lo) * (Ht - T - B) : v / hi * (Ht - T - B);
+  const chart = H.length > 1 ? `<svg class="dchart" viewBox="0 0 ${W} ${Ht}">${H.map((x, i) => { const v = vals[i], h = Math.max(4, bh(v)), xx = L + i * cw + (cw - bw) / 2, y = Ht - B - h, me = x === l; return `<rect x="${xx}" y="${y}" width="${bw}" height="${h}" rx="6" fill="${me ? 'var(--acc)' : 'currentColor'}" opacity="${me ? 1 : .18}"><title>${esc(x.name)}</title></rect><text x="${xx + bw / 2}" y="${y - 6}" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">${run ? mmss(v) : fr(v, 1)}</text><text x="${xx + bw / 2}" y="${Ht - B + 16}" text-anchor="middle" font-size="11" fill="currentColor" opacity=".6">${dS(x.start)}</text><text x="${xx + bw / 2}" y="${Ht - B + 30}" text-anchor="middle" font-size="10" fill="currentColor" opacity=".45">${fr(x.km, 1)} km</text>`; }).join('')}
+    ${run ? `<line x1="${L}" x2="${W - R}" y1="${Ht - B - bh(goal)}" y2="${Ht - B - bh(goal)}" stroke="#16a34a" stroke-width="2" stroke-dasharray="6 5"/><text x="${L - 6}" y="${Ht - B - bh(goal) + 4}" text-anchor="end" font-size="11" font-weight="700" fill="#16a34a">4:30</text>` : ''}</svg>
+    <p class="tiny">${run ? 'Allure moyenne (min/km) de tes dernières courses : plus la barre est haute, plus tu étais rapide. La ligne verte, c\'est ton objectif 4:30/km.' : 'Vitesse moyenne (km/h) de tes dernières sorties.'} En orange : cette sortie.</p>` : '';
   const prompt = `Tu es mon coach ${run ? 'course à pied' : 'vélo de route'}. ${ME}\n\nAnalyse ma sortie « ${l.name} » du ${dL(l.start)} : ${fr(l.km, 2)} km en ${hms(l.sec)}${run ? `, allure ${mmss(l.pace || l.sec / l.km)}/km` : `, ${fr(l.kmh, 1)} km/h`}, ${l.elev || 0} m D+${l.hr ? ', FC moyenne ' + l.hr + ' bpm' : ''}.\nMes sorties précédentes :\n${before.slice(-8).map(x => `- ${dS(x.start)} : ${fr(x.km, 1)} km, ${run ? mmss(x.pace || x.sec / x.km) + '/km' : fr(x.kmh, 1) + ' km/h'}`).join('\n') || '- aucune'}\n\n${run ? 'Mon objectif : 4:30/km (record 10 km 50:58). ' : ''}Dis-moi ce que tu en penses et propose ma prochaine sortie précise. Réponds en français, tutoie-moi.`;
-  return `<div class="kpis big"><div><small>Distance</small><b>${fr(l.km, 2)} km</b></div><div><small>Durée</small><b>${hms(l.sec)}</b></div><div><small>${run ? 'Allure' : 'Vitesse'}</small><b>${run ? mmss(l.pace || l.sec / l.km) + '/km' : fr(l.kmh, 1) + ' km/h'}</b></div><div><small>Dénivelé</small><b>${l.elev || 0} m</b><em>${l.hr ? '❤️ ' + l.hr + ' bpm' : ''}</em></div></div>
-  <div class="anagrid"><section class="tcard"><h2 class="h2s">Le verdict</h2><ul class="verdict">${notes.map(([i, t]) => `<li><span>${i}</span><p>${t}</p></li>`).join('')}</ul></section><section class="tcard"><h2 class="h2s">${run ? 'Ton allure' : 'Ta vitesse'} dans le temps</h2>${chart || '<p class="tiny">Pas encore assez de sorties.</p>'}</section></div>
+  const strava = l.src === 'strava' && window.ACT;
+  return `${strava ? window.ACT.shell(l) : `<div class="kpis big"><div><small>Distance</small><b>${fr(l.km, 2)} km</b></div><div><small>Durée</small><b>${hms(l.sec)}</b></div><div><small>${run ? 'Allure' : 'Vitesse'}</small><b>${run ? mmss(l.pace || l.sec / l.km) + '/km' : fr(l.kmh, 1) + ' km/h'}</b></div><div><small>Dénivelé</small><b>${l.elev || 0} m</b><em>${l.hr ? '❤️ ' + l.hr + ' bpm' : ''}</em></div></div>`}
+  <section class="tcard"><h2 class="h2s">Le verdict</h2><ul class="verdict">${notes.map(([i, t]) => `<li><span>${i}</span><p>${t}</p></li>`).join('')}</ul></section>
+  <section class="tcard"><h2 class="h2s">Comparé à tes ${H.length - 1} dernières ${run ? 'courses' : 'sorties'}</h2>${chart || '<p class="tiny">Pas encore assez de sorties pour comparer.</p>'}</section>
   ${claudeBox(prompt, 'Analyse ma sortie avec Claude')}`;
 }
 function claudeBox(prompt, label) {
@@ -274,7 +279,7 @@ VIEWS.ana = () => {
     <div class="lhero slim"><div><div class="kicker">${kindIcon(l)} ${esc(dL(l.start))}</div><h1 class="bigt">${esc(l.name)}</h1></div>${l.sid ? `<button class="p" data-act="start" data-sid="${esc(l.sid)}">Refaire cette séance</button>` : l.src === 'strava' ? `<a class="btn" href="https://www.strava.com/activities/${esc(String(l.id).replace('strava_', ''))}" target="_blank" rel="noopener">Voir sur Strava</a>` : ''}</div>
     <div class="exo-cols"><div class="exo-main">${l.kind === 'run' || l.kind === 'bike' ? anaCardio(l) : anaGym(l)}</div>${side}</div>`;
 };
-AFTER.ana = () => { };
+AFTER.ana = () => { if (window.ACT) window.ACT.fill(); };
 VIEWS.anaOpen = id => { anaId = id; };
 
 /* ---------- événements ---------- */
@@ -340,5 +345,6 @@ document.addEventListener('drop', ev => {
 });
 document.addEventListener('dragend', () => { drag = null; for (const x of document.querySelectorAll('.dragging,.dropover')) x.classList.remove('dragging', 'dropover'); });
 
+document.addEventListener('click', ev => { const nb = ev.target.closest('#nav button'); if (!nb) return; const v = nb.dataset.view; if (v === 'ana') anaId = null; if (v === 'lib') { libM = ''; libE = ''; libQ = ''; } if (v === 'progs') libPick = null; }, true);
 window.DESK = { isDesk, openEx: id => { exoId = id; C().go('exo'); }, openAna: id => { anaId = id; C().go('ana'); } };
 }

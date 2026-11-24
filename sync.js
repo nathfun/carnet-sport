@@ -197,5 +197,5 @@ setTimeout(() => run(), 1500);
 new MutationObserver(() => { const st = document.getElementById('stravast'); if (st && !st.dataset.done) { st.dataset.done = 1; stravaBox(); } }).observe(document.body, { childList: true, subtree: true });
 if (/[?&]strava=/.test(location.search)) history.replaceState(null, '', location.pathname);
 
-window.SYNC = { track, run, html, on, uid, tomb: u => { const S = C() && C().S(); if (S && u) { S._mdel = S._mdel || []; if (!S._mdel.includes(u)) S._mdel.push(u); dirty = true; C().save(); } } };
+window.SYNC = { track, run, html, on, uid, get: async path => { const r = await api(path); if (!r.ok) throw new Error('http ' + r.status); return r.json(); }, tomb: u => { const S = C() && C().S(); if (S && u) { S._mdel = S._mdel || []; if (!S._mdel.includes(u)) S._mdel.push(u); dirty = true; C().save(); } } };
 })();

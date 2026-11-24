@@ -71,6 +71,40 @@ async function ensureWebhook(env, origin) {
   const r = await fetch('https://www.strava.com/api/v3/push_subscriptions', { method: 'POST', body });
   return r.ok;
 }
+async function actDetail(env, id) {
+  const ck = 'act:' + id, hit = await env.KV.get(ck, 'json'); if (hit) return hit;
+  const tok = await stravaToken(env); if (!tok) return null;
+  const H = { headers: { Authorization: 'Bearer ' + tok } };
+  const [ar, sr] = await Promise.all([fetch('https://www.strava.com/api/v3/activities/' + id, H), fetch(`https://www.strava.com/api/v3/activities/${id}/streams?keys=time,distance,latlng,altitude,heartrate,velocity_smooth,moving,cadence&key_by_type=true`, H)]);
+  if (!ar.ok) return null;
+  const a = await ar.json(), st = sr.ok ? await sr.json() : {};
+  const g = k => (st[k] && st[k].data) || [];
+  const T = g('time'), D = g('distance'), LL = g('latlng'), ALT = g('altitude'), HR = g('heartrate'), V = g('velocity_smooth'), MV = g('moving'), CAD = g('cadence');
+  const run = RUN.includes(a.sport_type || a.type), n = T.length;
+  // découpage par km (course) ou par 5 km (vélo), calculé sur les données complètes
+  let splits = [];
+  if (run && Array.isArray(a.splits_metric) && a.splits_metric.length) splits = a.splits_metric.map(x => ({ km: Math.round(x.distance) / 1000, sec: x.moving_time, elev: Math.round(x.elevation_difference || 0), hr: x.average_heartrate ? Math.round(x.average_heartrate) : null }));
+  else if (n && D.length === n) {
+    const step = run ? 1000 : 5000; let i0 = 0, mov = 0, hs = 0, hn = 0, next = step;
+    for (let i = 1; i < n; i++) {
+      const dt = T[i] - T[i - 1]; if (!MV.length || MV[i]) mov += dt; if (HR[i]) { hs += HR[i] * dt; hn += dt; }
+      if (D[i] >= next || i === n - 1) { splits.push({ km: Math.round((D[i] - D[i0])) / 1000, sec: mov, elev: ALT.length ? Math.round(ALT[i] - ALT[i0]) : 0, hr: hn ? Math.round(hs / hn) : null }); i0 = i; mov = 0; hs = 0; hn = 0; next += step; }
+    }
+    splits = splits.filter(x => x.km > 0.05);
+  }
+  // échantillonnage : 900 points maximum pour les graphiques et la carte
+  const keep = Math.max(1, Math.ceil(n / 900)), idx = []; for (let i = 0; i < n; i += keep) idx.push(i); if (n && idx.at(-1) !== n - 1) idx.push(n - 1);
+  const pick = (arr, f = x => x) => arr.length === n ? idx.map(i => f(arr[i])) : [];
+  const out = {
+    id: a.id, run, name: a.name, type: a.sport_type || a.type, start: Date.parse(a.start_date), dist: a.distance, moving: a.moving_time, elapsed: a.elapsed_time,
+    elev: a.total_elevation_gain, hrAvg: a.average_heartrate || null, hrMax: a.max_heartrate || null, cad: a.average_cadence ? Math.round(a.average_cadence * (run ? 2 : 1)) : null,
+    cal: a.calories || null, vMax: a.max_speed || null, watts: a.average_watts || null, desc: a.description || '',
+    splits, efforts: (a.best_efforts || []).map(e => ({ name: e.name, sec: e.moving_time, dist: e.distance, pr: e.pr_rank || 0 })),
+    s: { t: pick(T), d: pick(D, x => Math.round(x)), v: pick(V, x => Math.round(x * 100) / 100), hr: pick(HR), alt: pick(ALT, x => Math.round(x * 10) / 10), cad: pick(CAD), ll: pick(LL, p => [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5]) },
+  };
+  await env.KV.put(ck, JSON.stringify(out), { expirationTtl: 60 * 86400 });
+  return out;
+}
 const page = (title, msg) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><body style="font:17px system-ui;padding:40px 24px;text-align:center;background:#111;color:#fff"><h1 style="font-size:26px">${title}</h1><p>${msg}</p><p><a style="display:inline-block;margin-top:16px;padding:14px 22px;background:#fc4c02;color:#fff;border-radius:12px;text-decoration:none;font-weight:700" href="${APP_URL}">Retour à l'app</a></p></body>`, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 
 const same = (a, b) => {
@@ -149,6 +183,11 @@ export default {
       const t = await env.KV.get('strava', 'json'); if (!t) return json(req, { error: 'pas connecté' }, 400);
       if (t.last && Date.now() - t.last < 10 * 60 * 1000 && !url.searchParams.get('force')) return json(req, { added: 0, skipped: true });
       return json(req, { added: await backfill(env, 30) });
+    }
+    const am = p.match(/^\/strava\/act\/(\d{1,20})$/);
+    if (am && req.method === 'GET') {
+      const d = await actDetail(env, am[1]);
+      return d ? json(req, d) : json(req, { error: 'indisponible' }, 404);
     }
     if (p === '/strava/unlink' && req.method === 'POST') {
       const tok = await stravaToken(env);
