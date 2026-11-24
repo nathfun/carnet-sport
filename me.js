@@ -8,7 +8,7 @@ const fr = (v, d = 0) => Number(v).toLocaleString('fr-FR', { minimumFractionDigi
 const dFr = t => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 let meSub = 'corps', range = 'mois';
 const MEAS = [['bras', 'Tour de bras'], ['taille', 'Tour de taille'], ['cuisses', 'Tour de cuisses'], ['poitrine', 'Tour de poitrine']];
-const THEMES = [['chrono', 'Le Chrono', 'Clair, net, graphique'], ['aurore', "L'Aurore", 'Clair, lumineux, doux'], ['terre', 'La Terre', 'Clair, chaud, naturel'], ['profondeurs', 'Les Profondeurs', 'Sombre, profond, calme']];
+const THEMES = [['chrono', 'Le Chrono', 'Clair, net, graphique'], ['aurore', "L'Aurore", 'Dégradés rose et violet'], ['terre', 'La Salle', 'Sombre, noir et rouge'], ['profondeurs', 'Les Profondeurs', 'Sombre, profond, calme']];
 
 function weightChart(ws) {
   const now = Date.now(), from = range === 'mois' ? now - 31 * 864e5 : range === 'annee' ? now - 366 * 864e5 : 0;
