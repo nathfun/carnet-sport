@@ -18,6 +18,7 @@
 <main id="app"></main>
 
 <div id="dock">
+  <div class="dbrand">Carnet <b>sport</b></div>
   <button id="live" hidden aria-label="Revenir à la séance">
     <span class="lv-dot"></span>
     <span class="lv-total" data-clock="total">0:00</span>
@@ -28,6 +29,9 @@
     <button data-view="home">Accueil</button>
     <button data-view="program">Séances</button>
     <button data-view="progress">Journal</button>
+    <button data-view="ana" class="desk">Analyses</button>
+    <button data-view="lib" class="desk">Exercices</button>
+    <button data-view="progs" class="desk">Programmes</button>
     <button data-view="tools">Outils</button>
     <button data-view="me">Moi</button>
   </nav>
@@ -46,6 +50,7 @@
 <script src="nutri.js"></script>
 <script src="me.js"></script>
 <script src="extras.js"></script>
+<script src="desk.js"></script>
 <script src="sync.js"></script>
 <script src="app.js"></script>
 </body>

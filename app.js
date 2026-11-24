@@ -108,7 +108,7 @@ function go(v) { view = v; render(); window.scrollTo(0, 0); }
 function render() {
   for (const b of document.querySelectorAll('#nav button')) b.classList.toggle('sel', b.dataset.view === view);
   const V = window.VIEWS || {};
-  app.innerHTML = ({ home: vHome, workout: vWorkout, program: V.seances, progress: V.journal, tools: V.tools, me: V.me }[view] || vHome)();
+  app.innerHTML = ({ home: vHome, workout: vWorkout, program: V.seances, progress: V.journal, tools: V.tools, me: V.me }[view] || V[view] || vHome)();
   document.body.dataset.view = view;
   const A = (window.AFTER || {})[view]; if (A) try { A(); } catch (e) { console.error(e); }
   if (view === 'workout' && S.draft) { const c = S.draft.ex[S.draft.cur]; if (c) { fillMedia(c.id); fillGymMedia(c.id); } }
@@ -492,7 +492,7 @@ function settingsInner() {
   <div class="sec">Semaine de décharge</div><p class="tiny">Une semaine plus légère conseillée toutes les :</p>
   <div class="pills">${[6, 7, 8].map(n => `<button class="${(window.DELOAD ? window.DELOAD.cfg().every : 7) === n ? 'sel' : ''}" data-ex="deloadevery" data-v="${n}">${n} semaines</button>`).join('')}</div>
   ${window.SYNC ? window.SYNC.html() : ''}
-  <div class="sec">Version</div><p class="tiny">Version 16 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
+  <div class="sec">Version</div><p class="tiny">Version 17 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
   <div class="sec">Sauvegarde</div>
   <p class="tiny">Copie de secours manuelle, utile si la synchro n'est pas activée. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
@@ -628,10 +628,10 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloaded) return; reloaded = true; if (!S.draft) location.reload(); else toast("Nouvelle version prête : elle s'appliquera à la prochaine ouverture"); });
 }
 
-window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid), ding, blip, unlockAudio, wakeOn, refreshRec };
+window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid), ding, blip, unlockAudio, wakeOn, refreshRec, allEx };
 window.CARNET_fillMedia = fillMedia;
 window.CARNET.media = { ready: () => idbReady, list: mediaFor, tx: mediaTx };
-if (!['home', 'workout', 'program', 'progress', 'tools', 'me'].includes(view)) view = 'home';
+if (!['home', 'workout', 'program', 'progress', 'tools', 'me', 'lib', 'exo', 'progs', 'ana'].includes(view)) view = 'home';
 window.applyTheme && window.applyTheme();
 window.weekCountNow = () => weekCounts().get(monday(Date.now())) || 0;
 setTimeout(() => { try { window.dailyChecks && window.dailyChecks(); } catch (e) { console.error(e); } }, 1200);

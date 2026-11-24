@@ -105,6 +105,7 @@ function sessionSheet(id) {
     ${(l.ex || []).map(e => `<div class="sesex"><b>${esc(e.n)}</b><div>${e.sets.map(s => `<span class="${s.t ? 'st-' + s.t : ''}">${fk(s.kg)} × ${s.r}</span>`).join('')}</div></div>`).join('') || '<p class="tiny">Activité notée sans détail.</p>'}
     ${l.note ? `<p class="small">${esc(l.note)}</p>` : ''}
     <div class="row" style="margin-top:12px">${l.sid ? `<button class="grow" data-act="start" data-sid="${esc(l.sid)}">Refaire</button>` : ''}<button class="grow" data-jr="storyof" data-v="${esc(l.id)}">Partager</button></div>
+    <button class="p wide" style="margin-top:8px" data-close data-lib="ana" data-id="${esc(l.id)}">Analyse complète</button>
     <button class="ghost wide" style="margin-top:8px" data-close>Fermer</button>`);
 }
 function spark(vals, w = 90, h = 28) { if (vals.length < 2) return ''; const mn = Math.min(...vals), mx = Math.max(...vals); return `<svg class="spark" viewBox="0 0 ${w} ${h}"><path d="${vals.map((v, i) => (i ? 'L' : 'M') + (i * w / (vals.length - 1)).toFixed(1) + ',' + (h - 3 - (mx === mn ? .5 : (v - mn) / (mx - mn)) * (h - 6)).toFixed(1)).join('')}" fill="none" stroke="var(--acc)" stroke-width="2"/></svg>`; }
@@ -205,7 +206,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-jr]'); if (!b || !window.CARNET) return; const v = b.dataset.v;
   switch (b.dataset.jr) {
     case 'tab': tab = v; exOpen = null; C().go('progress'); return;
-    case 'detail': sessionSheet(v); return;
+    case 'detail': if (window.DESK && window.DESK.isDesk()) { window.DESK.openAna(v); return; } sessionSheet(v); return;
     case 'exo': exOpen = v; window.scrollTo(0, 0); break;
     case 'back': exOpen = null; break;
     case 'cprev': { const d = new Date(calT); d.setMonth(d.getMonth() - 1); calT = d.getTime(); break; }

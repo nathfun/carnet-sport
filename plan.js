@@ -77,7 +77,7 @@ function vMonth() {
 VIEWS.seances = () => {
   const tabs = `<div class="kicker">Entraînement</div><div class="between"><h1>Mes séances</h1><button class="p sm" data-pl="new" data-d="${day0(Date.now())}">+ Séance</button></div><div class="seg" style="margin:12px 0">${[['cal', 'Calendrier'], ['modeles', 'Mes modèles'], ['exos', 'Exercices']].map(([k, l]) => `<button class="${sub === k ? 'sel' : ''}" data-pl="sub" data-v="${k}">${l}</button>`).join('')}</div>`;
   if (sub === 'modeles') return tabs + VIEWS.models();
-  if (sub === 'exos') return tabs + C().vExos();
+  if (sub === 'exos') { setTimeout(() => window.AFTER.lib && window.AFTER.lib(), 0); return tabs + window.VIEWS.lib(); }
   return tabs + seg2() + (mode === 'semaine' ? vWeek() : vMonth()) + `<div id="sdet">${detail()}</div>`;
 };
 const seg2 = () => `<div class="seg mini2" style="margin-bottom:10px">${[['semaine', 'Semaine'], ['mois', 'Mois']].map(([k, l]) => `<button class="${mode === k ? 'sel' : ''}" data-pl="mode" data-v="${k}">${l}</button>`).join('')}</div>`;
