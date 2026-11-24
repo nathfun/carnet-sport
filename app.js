@@ -46,7 +46,7 @@ if (!S.plans) { const f = Date.now() - 864e5 * 400, P = (id, kind, sid, name, d,
   S.plans = [P('p_pa', 'muscu', 'pecsA', '', 1, 'apm'), P('p_da', 'muscu', 'dosA', '', 2, 'apm'), P('p_run', 'run', '', 'Course · fractionné', 3, 'soir'), P('p_pb', 'muscu', 'pecsB', '', 4, 'apm'), P('p_db', 'muscu', 'dosB', '', 5, 'apm'), P('p_bike', 'bike', '', 'Vélo de route', 6, 'matin')]; }
 if ((S.progV || 1) < 2) { const d = defaultProgram(); for (const id of ['pecsA', 'pecsB', 'dosA']) { const i = S.program.findIndex(p => p.id === id), n = d.find(p => p.id === id); if (i >= 0) S.program[i] = n; } S.progV = 2; }
 let saveFail = false;
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); saveFail = false; } catch (e) { if (!saveFail) toast('Mémoire du téléphone pleine : exporte tes données'); saveFail = true; } };
+const save = () => { window.SYNC && window.SYNC.track(S); try { localStorage.setItem(KEY, JSON.stringify(S)); saveFail = false; } catch (e) { if (!saveFail) toast('Mémoire du téléphone pleine : exporte tes données'); saveFail = true; } };
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
 let view = S.draft ? 'workout' : 'home';
 
@@ -54,7 +54,10 @@ let view = S.draft ? 'workout' : 'home';
 let idb = null;
 const idbReady = new Promise(res => { try { const r = indexedDB.open('carnet-media', 1); r.onupgradeneeded = () => r.result.createObjectStore('media', { keyPath: 'k', autoIncrement: true }).createIndex('ex', 'ex'); r.onsuccess = () => { idb = r.result; res(); }; r.onerror = () => res(); } catch (e) { res(); } });
 const mediaFor = ex => new Promise(res => { if (!idb) return res([]); try { const q = idb.transaction('media').objectStore('media').index('ex').getAll(ex); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); } catch (e) { res([]); } });
-const mediaTx = (fn) => new Promise(res => { if (!idb) return res(); const t = idb.transaction('media', 'readwrite'); fn(t.objectStore('media')); t.oncomplete = res; t.onerror = () => { toast("Impossible d'enregistrer ce fichier"); res(); }; });
+const mediaWrap = st => ({ raw: st, get: k => st.get(k), getAll: (...x) => st.getAll(...x), index: n => st.index(n), put: r => st.put(r),
+  add: r => { if (!r.uid && window.SYNC) r.uid = window.SYNC.uid(); return st.add(r); },
+  delete: k => { const g = st.get(k); g.onsuccess = () => { if (g.result && g.result.uid && window.SYNC) window.SYNC.tomb(g.result.uid); st.delete(k); }; } });
+const mediaTx = (fn) => new Promise(res => { if (!idb) return res(); const t = idb.transaction('media', 'readwrite'); fn(mediaWrap(t.objectStore('media'))); t.oncomplete = res; t.onerror = () => { toast("Impossible d'enregistrer ce fichier"); res(); }; });
 const objUrls = [];
 async function fillMedia(exId) {
   await idbReady; const boxes = document.querySelectorAll(`[data-media="${CSS.escape(exId)}"]`); if (!boxes.length) return;
@@ -488,9 +491,10 @@ function settingsInner() {
   <button class="wide" data-ex="ics">Ajouter mes séances au calendrier iPhone</button>
   <div class="sec">Semaine de décharge</div><p class="tiny">Une semaine plus légère conseillée toutes les :</p>
   <div class="pills">${[6, 7, 8].map(n => `<button class="${(window.DELOAD ? window.DELOAD.cfg().every : 7) === n ? 'sel' : ''}" data-ex="deloadevery" data-v="${n}">${n} semaines</button>`).join('')}</div>
-  <div class="sec">Version</div><p class="tiny">Version 14 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
+  ${window.SYNC ? window.SYNC.html() : ''}
+  <div class="sec">Version</div><p class="tiny">Version 15 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
   <div class="sec">Sauvegarde</div>
-  <p class="tiny">Tout est enregistré sur cet appareil (téléphone ou ordi), sans synchro automatique. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
+  <p class="tiny">Copie de secours manuelle, utile si la synchro n'est pas activée. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
   <div class="row"><button class="grow" data-act="export">Exporter mes données</button><label class="btn grow">Importer<input type="file" accept="application/json,.json" hidden id="impf"></label></div>
   <button class="ghost wide" style="margin-top:8px" data-close>Fermer</button></div>`);
@@ -624,7 +628,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloaded) return; reloaded = true; if (!S.draft) location.reload(); else toast("Nouvelle version prête : elle s'appliquera à la prochaine ouverture"); });
 }
 
-window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid), ding, blip, unlockAudio, wakeOn };
+window.CARNET = { S: () => S, save, render, go, toast, sheet, closeSheet, body, REC: () => REC, coach: vCoachClaude, settingsHtml, start, lastSets, metaOf, addExSheet, vProgram, vExos, planNew: sid => window.VIEWS.planNew(sid), ding, blip, unlockAudio, wakeOn, refreshRec };
 window.CARNET_fillMedia = fillMedia;
 window.CARNET.media = { ready: () => idbReady, list: mediaFor, tx: mediaTx };
 if (!['home', 'workout', 'program', 'progress', 'tools', 'me'].includes(view)) view = 'home';

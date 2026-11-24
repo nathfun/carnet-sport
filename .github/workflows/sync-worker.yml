@@ -1,0 +1,44 @@
+name: Déployer le serveur de synchro
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['worker/**', '.github/workflows/sync-worker.yml']
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: worker } }
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Vérifier les secrets
+        run: |
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::Secret CLOUDFLARE_API_TOKEN manquant"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::Secret CLOUDFLARE_ACCOUNT_ID manquant"; exit 1; }
+          [ -n "${{ secrets.SYNC_KEY }}" ] || { echo "::error::Secret SYNC_KEY manquant"; exit 1; }
+      - name: Installer wrangler
+        run: npm i -g wrangler@3
+      - name: Base de données (KV)
+        run: |
+          ID=$(wrangler kv namespace list | jq -r '.[] | select(.title | endswith("carnet-sync")) | .id' | head -1)
+          if [ -z "$ID" ]; then
+            wrangler kv namespace create carnet-sync
+            ID=$(wrangler kv namespace list | jq -r '.[] | select(.title | endswith("carnet-sync")) | .id' | head -1)
+          fi
+          [ -n "$ID" ] || { echo "::error::Impossible de créer la base KV"; exit 1; }
+          sed -i "s/__KV_ID__/$ID/" wrangler.toml
+      - name: Déployer
+        run: wrangler deploy
+      - name: Clé de synchro
+        run: printf '%s' "${{ secrets.SYNC_KEY }}" | wrangler secret put SYNC_KEY
+      - name: Adresse du serveur
+        run: |
+          SUB=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain')
+          echo "## ✅ Serveur prêt" >> $GITHUB_STEP_SUMMARY
+          echo "Colle cette adresse dans l'app (Moi → Réglages → Synchro) :" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`https://carnet-sport-sync.$SUB.workers.dev\`" >> $GITHUB_STEP_SUMMARY
