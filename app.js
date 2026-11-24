@@ -35,7 +35,7 @@ const KEY = 'carnet-sport.v1';
 let S = null;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { }
 if (!S || !Array.isArray(S.program)) S = { progV: 2, program: defaultProgram(), lib: [], log: [], draft: null, badges: {}, set: { spotify: '', goal: 1, exRest: 180 } };
-S.set = { spotify: '', goal: 1, exRest: 180, ...S.set }; S.lib = S.lib || []; S.badges = S.badges || {};
+S.set = { spotify: '', goal: 1, exRest: 180, ...S.set }; S.lib = S.lib || []; S.badges = S.badges || {}; S.guides = S.guides || {};
 for (const e of SPARE) if (!S.lib.some(x => x.id === e.id)) S.lib.push(e);
 if ((S.progV || 1) < 2) { const d = defaultProgram(); for (const id of ['pecsA', 'pecsB', 'dosA']) { const i = S.program.findIndex(p => p.id === id), n = d.find(p => p.id === id); if (i >= 0) S.program[i] = n; } S.progV = 2; }
 let saveFail = false;
@@ -50,9 +50,9 @@ const mediaFor = ex => new Promise(res => { if (!idb) return res([]); try { cons
 const mediaTx = (fn) => new Promise(res => { if (!idb) return res(); const t = idb.transaction('media', 'readwrite'); fn(t.objectStore('media')); t.oncomplete = res; t.onerror = () => { toast("Impossible d'enregistrer ce fichier"); res(); }; });
 const objUrls = [];
 async function fillMedia(exId) {
-  await idbReady; const box = document.querySelector(`[data-media="${CSS.escape(exId)}"]`); if (!box) return;
+  await idbReady; const boxes = document.querySelectorAll(`[data-media="${CSS.escape(exId)}"]`); if (!boxes.length) return;
   const list = await mediaFor(exId);
-  box.innerHTML = list.length ? list.map(m => { const u = URL.createObjectURL(m.blob); objUrls.push(u); return `<figure>${String(m.type).startsWith('video') ? `<video src="${u}" muted loop playsinline controls preload="metadata"></video>` : `<img src="${u}" alt="Ma démo">`}<button data-act="delmedia" data-k="${m.k}" data-ex="${esc(exId)}">Retirer</button></figure>`; }).join('') : '<p class="tiny">Aucune photo ni vidéo pour cet exercice. Ajoute la tienne, elle sera dispo même sans réseau.</p>';
+  for (const box of boxes) box.innerHTML = list.length ? list.map(m => { const u = URL.createObjectURL(m.blob); objUrls.push(u); return `<figure>${String(m.type).startsWith('video') ? `<video src="${u}" muted loop playsinline controls preload="metadata"></video>` : `<img src="${u}" alt="Ma démo">`}<button data-act="delmedia" data-k="${m.k}" data-ex="${esc(exId)}">Retirer</button></figure>`; }).join('') : '<p class="tiny">Aucune photo ni vidéo pour cet exercice. Ajoute la tienne, elle sera dispo même sans réseau.</p>';
 }
 
 /* ---------- calculs ---------- */
@@ -131,6 +131,10 @@ function vHome() {
   <div class="badges">${BADGES.filter(b => S.badges[b.id]).slice(-6).map(b => badgeHtml(b, true)).join('') || '<p class="tiny">Termine ta première séance pour débloquer ton premier palier.</p>'}</div>`;
 }
 
+const demoBlock = (id, q, label) => `<details data-mfor="${esc(id)}" ${S.guides[id] ? 'open' : ''}><summary>${label}</summary>
+  ${S.guides[id] ? `<p class="small" style="white-space:pre-wrap">${esc(S.guides[id])}</p>` : ''}
+  <div class="media" data-media="${esc(id)}"></div>
+  <div class="row"><label class="btn sm">Ajouter photo, GIF ou vidéo<input type="file" accept="image/*,video/*" multiple hidden data-add="${esc(id)}"></label><a class="btn sm" href="${yt(q)}" target="_blank" rel="noopener">Vidéos YouTube</a></div></details>`;
 function exCard(e, i, D) {
   const cur = i === D.cur, done = e.state === 'done', skip = e.state === 'skip', nOk = e.sets.filter(s => s.ok).length;
   const pill = done ? '<span class="pill ok">Fait</span>' : skip ? '<span class="pill">Passé</span>' : cur ? '<span class="pill cur">En cours</span>' : `<span class="pill">${nOk}/${e.sets.length}</span>`;
@@ -144,9 +148,7 @@ function exCard(e, i, D) {
       <button class="ck" data-act="ck" data-j="${j}" aria-label="Valider la série ${j + 1}">${s.ok ? 'Fait' : 'OK'}</button></div>`).join('')}
     <div class="row" style="margin-top:8px"><button class="sm" data-act="addset">+ série</button><button class="sm" data-act="rmset" ${e.sets.length < 2 ? 'disabled' : ''}>− série</button><button class="sm ghost" data-act="skip">Passer l'exercice</button></div>
     <button class="p wide" style="margin-top:10px" data-act="exdone">Exercice terminé</button>
-    <details style="margin-top:8px"><summary>Démo et mes photos / vidéos</summary>
-      <div class="media" data-media="${esc(e.id)}"></div>
-      <div class="row"><label class="btn sm">Ajouter photo, GIF ou vidéo<input type="file" accept="image/*,video/*" multiple hidden data-add="${esc(e.id)}"></label><a class="btn sm" href="${yt(e.q)}" target="_blank" rel="noopener">Vidéos YouTube</a></div></details></div>`;
+    <div style="margin-top:8px">${demoBlock(e.id, e.q, 'Guide, photos et vidéos')}</div></div>`;
   }
   return `<article class="ex ${cur ? 'cur' : ''} ${done ? 'done' : ''} ${skip ? 'skip' : ''}"><button class="exh" data-act="pick" data-i="${i}"><div><h3>${esc(e.n)}</h3><div class="tiny">${e.sets.length} × ${esc(e.reps)} · repos ${restLabel(e.rest)}</div></div>${pill}</button>${body}</article>`;
 }
@@ -173,6 +175,10 @@ function vProgram() {
       <label>Séries<input inputmode="numeric" value="${e.sets}" data-pf="sets" data-si="${si}" data-ei="${ei}"></label>
       <label>Reps<input value="${esc(e.reps)}" data-pf="reps" data-si="${si}" data-ei="${ei}"></label>
       <label>Repos (s)<input inputmode="numeric" value="${e.rest}" data-pf="rest" data-si="${si}" data-ei="${ei}"></label>
+      <div class="pdemo"><details data-mfor="${esc(e.id)}"><summary>Guide, photos et vidéos${S.guides[e.id] ? ' · guide écrit' : ''}</summary>
+        <label>Guide / consignes (réglages machine, placement…)<textarea rows="3" data-guide="${esc(e.id)}" placeholder="Ex. siège cran 4, dos collé, pousser sans verrouiller les coudes">${esc(S.guides[e.id] || '')}</textarea></label>
+        <div class="media" data-media="${esc(e.id)}"></div>
+        <div class="row"><label class="btn sm">Ajouter photo, GIF ou vidéo<input type="file" accept="image/*,video/*" multiple hidden data-add="${esc(e.id)}"></label><a class="btn sm" href="${yt(e.q || e.n)}" target="_blank" rel="noopener">Vidéos YouTube</a></div></details></div>
       <div class="ctl"><button class="sm" data-act="pmove" data-si="${si}" data-ei="${ei}" data-d="-1" ${ei ? '' : 'disabled'} aria-label="Monter">Monter</button><button class="sm" data-act="pmove" data-si="${si}" data-ei="${ei}" data-d="1" ${ei < s.ex.length - 1 ? '' : 'disabled'} aria-label="Descendre">Descendre</button><button class="sm ghost" data-act="pdel" data-si="${si}" data-ei="${ei}">Retirer</button></div></div>`).join('')}</div>
     <div class="row" style="margin-top:10px"><button class="sm grow" data-act="paddex" data-si="${si}">+ Exercice</button><button class="sm ghost" data-act="pdelsess" data-si="${si}">Supprimer la séance</button></div></div>`).join('')}
   <button class="wide" data-act="paddsess">+ Nouvelle séance</button>
@@ -360,13 +366,14 @@ document.addEventListener('click', async ev => {
     case 'ask': { const q = ($('#cq').value || '').trim() || QUICK[0]; const p = coachPrompt(q); try { await navigator.clipboard.writeText(p); } catch (e) { } const l = document.createElement('a'); l.href = 'https://claude.ai/new?q=' + encodeURIComponent(p.slice(0, 6000)); l.target = '_blank'; l.rel = 'noopener'; document.body.appendChild(l); l.click(); l.remove(); break; }
     case 'copyctx': { const p = coachPrompt(($('#cq').value || '').trim() || '(écris ta question ici)'); try { await navigator.clipboard.writeText(p); toast('Résumé copié : colle-le dans Claude'); } catch (e) { sheet(`<h2>Ton résumé</h2><p class="tiny">Sélectionne le texte et copie-le.</p><textarea rows="12" readonly>${esc(p)}</textarea><button class="wide" style="margin-top:8px" data-close>Fermer</button>`); } break; }
     case 'saveset': { const v = $('#spurl').value.trim(); if (v && !/^https:\/\/(open\.)?spotify\.com\//.test(v) && !/^https:\/\/spotify\.link\//.test(v)) { toast('Colle un lien Spotify (https://open.spotify.com/…)'); break; } S.set.spotify = v; S.set.goal = +$('#goal').value; S.set.exRest = +$('#exrest').value; save(); closeSheet(); render(); toast('Réglages enregistrés'); break; }
-    case 'export': { const blob = new Blob([JSON.stringify({ app: 'carnet-sport', v: 1, at: Date.now(), program: S.program, lib: S.lib, log: S.log, badges: S.badges, best: S.best, set: S.set })], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(blob); l.download = 'carnet-sport-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(l); l.click(); l.remove(); toast('Fichier exporté'); break; }
+    case 'export': { const blob = new Blob([JSON.stringify({ app: 'carnet-sport', v: 1, at: Date.now(), program: S.program, lib: S.lib, log: S.log, badges: S.badges, best: S.best, set: S.set, guides: S.guides })], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(blob); l.download = 'carnet-sport-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(l); l.click(); l.remove(); toast('Fichier exporté'); break; }
   }
 });
 document.addEventListener('input', ev => {
   const t = ev.target, D = S.draft;
   if (t.dataset.f === 'kg' || t.dataset.f === 'r') { const c = D.ex[D.cur]; c.sets[+t.dataset.j][t.dataset.f] = t.value; save(); }
   else if (t.dataset.f === 'note' && D) { D.note = t.value; save(); }
+  else if (t.dataset.guide) { const v = t.value; if (v.trim()) S.guides[t.dataset.guide] = v; else delete S.guides[t.dataset.guide]; save(); }
   else if (t.dataset.f === 'coachq') { S.coachQ = t.value; save(); }
   else if (t.dataset.pf) { const s = S.program[+t.dataset.si]; if (t.dataset.ei === undefined) s[t.dataset.pf] = t.value; else { const e = s.ex[+t.dataset.ei], f = t.dataset.pf; e[f] = f === 'sets' || f === 'rest' ? (parseInt(t.value) || 0) : t.value; if (f === 'n') e.q = t.value + ' technique'; } save(); }
 });
@@ -377,10 +384,11 @@ document.addEventListener('change', async ev => {
   else if (t.id === 'impf' && t.files[0]) {
     try { const v = JSON.parse(await t.files[0].text()); if (v.app !== 'carnet-sport' || !Array.isArray(v.log)) throw 0;
       const have = new Set(S.log.map(s => s.id)); for (const s of v.log) if (s && s.id && !have.has(s.id)) S.log.push(s); S.log.sort((a, b) => a.start - b.start);
-      if (Array.isArray(v.program) && v.program.length) S.program = v.program; if (Array.isArray(v.lib)) S.lib = v.lib; S.badges = { ...v.badges, ...S.badges }; S.best = Math.max(S.best || 0, v.best || 0); if (v.set) S.set = { ...S.set, ...v.set };
+      if (Array.isArray(v.program) && v.program.length) S.program = v.program; if (Array.isArray(v.lib)) S.lib = v.lib; S.badges = { ...v.badges, ...S.badges }; S.best = Math.max(S.best || 0, v.best || 0); if (v.set) S.set = { ...S.set, ...v.set }; if (v.guides) S.guides = { ...v.guides, ...S.guides };
       save(); closeSheet(); render(); toast('Données importées'); } catch (e) { toast("Ce fichier n'est pas une sauvegarde Carnet sport"); }
   }
 });
+document.addEventListener('toggle', ev => { const d = ev.target; if (d.open && d.dataset && d.dataset.mfor) fillMedia(d.dataset.mfor); }, true);
 addEventListener('online', () => view === 'coach' && render()); addEventListener('offline', () => view === 'coach' && render());
 
 /* ---------- hors ligne ---------- */

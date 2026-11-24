@@ -122,3 +122,5 @@ details summary{cursor:pointer;font-weight:600;padding:8px 0;color:var(--mute);f
 @media (max-width:380px){.set{grid-template-columns:26px minmax(0,1fr) minmax(0,1fr) 52px}}
 .trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
 .chips button{text-align:left;justify-content:flex-start;padding:8px 14px}
+.pdemo{grid-column:1/-1}.pdemo details{background:var(--card2);border-radius:12px;padding:2px 12px 10px}.pdemo summary{font-size:14px}
+[hidden]{display:none!important}
