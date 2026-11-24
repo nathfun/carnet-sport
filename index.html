@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carnet">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>Carnet sport</title>
+</head>
+<body>
+<main id="app"></main>
+
+<div id="dock">
+  <button id="live" hidden aria-label="Revenir à la séance">
+    <span class="lv-dot"></span>
+    <span class="lv-total" data-clock="total">0:00</span>
+    <span class="lv-rest" id="lvRest"></span>
+    <span class="lv-stop" id="lvStop" role="button" tabindex="0" hidden>Stop</span>
+  </button>
+  <nav id="nav">
+    <button data-view="home">Accueil</button>
+    <button data-view="workout">Séance</button>
+    <button data-view="program">Programme</button>
+    <button data-view="progress">Progrès</button>
+    <button data-view="coach">Coach</button>
+  </nav>
+</div>
+
+<div id="sheet" hidden><div class="sheet-bg" data-close></div><div class="sheet-card" role="dialog" aria-modal="true"><div id="sheetBody"></div></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
