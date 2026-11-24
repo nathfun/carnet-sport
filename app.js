@@ -468,6 +468,7 @@ function settingsInner() {
   <label style="margin-top:10px">Séances par semaine pour garder la flamme<select id="goal">${[1, 2, 3, 4, 5, 6].map(n => `<option ${n === S.set.goal ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
   <label style="margin-top:10px">Repos entre deux exercices<select id="exrest">${[90, 120, 150, 180, 240].map(n => `<option value="${n}" ${n === S.set.exRest ? 'selected' : ''}>${fmt(n)}</option>`).join('')}</select></label>
   <button class="p wide" style="margin-top:14px" data-act="saveset">Enregistrer</button>
+  <div class="sec">Version</div><p class="tiny">Version 12 de l'app. Avec du réseau, l'app se met à jour toute seule à l'ouverture.</p><button class="wide" data-act="upd">Rechercher une mise à jour</button>
   <div class="sec">Sauvegarde</div>
   <p class="tiny">Tout est enregistré sur cet appareil (téléphone ou ordi), sans synchro automatique. Pour passer tes séances, guides, photos et vidéos d'un appareil à l'autre : Exporter ici, envoie le fichier (AirDrop, iCloud Drive), puis Importer sur l'autre. Ce qui existe déjà n'est pas dupliqué.</p>
   <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:8px 0"><input type="checkbox" id="expmedia" checked style="width:22px;min-height:22px"> Inclure mes photos et vidéos</label>
@@ -492,6 +493,7 @@ document.addEventListener('click', async ev => {
   const a = b.dataset.act, D = S.draft, cur = D && D.ex[D.cur];
   switch (a) {
     case 'goto': go(b.dataset.v); break;
+    case 'upd': b.textContent = 'Recherche…'; try { const r = window.__reg || await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch (e) { } setTimeout(() => location.reload(), 600); break;
     case 'tool': window.VIEWS.toolsGoto(b.dataset.k); go('tools'); break;
     case 'settings': settingsSheet(); break;
     case 'start': if (!S.draft) start(b.dataset.sid); break;
@@ -597,7 +599,7 @@ addEventListener('online', () => view === 'coach' && render()); addEventListener
 
 /* ---------- hors ligne ---------- */
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => { });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => { window.__reg = r; r.update().catch(() => { }); document.addEventListener('visibilitychange', () => { if (!document.hidden) r.update().catch(() => { }); }); }).catch(() => { });
   let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloaded) return; reloaded = true; if (!S.draft) location.reload(); else toast("Nouvelle version prête : elle s'appliquera à la prochaine ouverture"); });
 }
