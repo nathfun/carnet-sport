@@ -6,3 +6,11 @@ workers_dev = true
 [[kv_namespaces]]
 binding = "KV"
 id = "__KV_ID__"
+
+[[durable_objects.bindings]]
+name = "TIMER"
+class_name = "PushTimer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PushTimer"]

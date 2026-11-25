@@ -191,6 +191,38 @@ async function withReacts(env, viewer, owner, acts) {
   return Promise.all(acts.map(async a => { const r = (await env.KV.get('r:' + owner + ':' + a.id, 'json')) || { likes: [], comments: [] }; return { ...a, owner, likes: r.likes.length, liked: r.likes.includes(viewer), comments: r.comments.length }; }));
 }
 
+/* ---------- notifications (Web Push) : fin de repos même app fermée ---------- */
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function getVapid(env) {
+  let v = await env.KV.get('vapid', 'json'); if (v) return v;
+  const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  v = { pub: b64u(await crypto.subtle.exportKey('raw', kp.publicKey)), jwk: await crypto.subtle.exportKey('jwk', kp.privateKey) };
+  await env.KV.put('vapid', JSON.stringify(v)); return v;
+}
+async function sendPush(env, sub) {
+  const v = await getVapid(env), aud = new URL(sub.endpoint).origin, enc = o => b64u(new TextEncoder().encode(JSON.stringify(o)));
+  const head = enc({ typ: 'JWT', alg: 'ES256' }) + '.' + enc({ aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'https://nathfun.github.io/carnet-sport/' });
+  const key = await crypto.subtle.importKey('jwk', v.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const sig = b64u(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(head)));
+  return fetch(sub.endpoint, { method: 'POST', headers: { TTL: '120', Urgency: 'high', Topic: 'rest', Authorization: `vapid t=${head}.${sig}, k=${v.pub}`, 'Content-Length': '0' } });
+}
+async function pushAll(env, u) {
+  const L = (await env.KV.get('push:' + u, 'json')) || []; if (!L.length) return 0;
+  const keep = []; let n = 0;
+  for (const sub of L) { try { const r = await sendPush(env, sub); if (r.status === 404 || r.status === 410) continue; if (r.ok) n++; keep.push(sub); } catch (e) { keep.push(sub); } }
+  if (keep.length !== L.length) await env.KV.put('push:' + u, JSON.stringify(keep));
+  return n;
+}
+export class PushTimer {
+  constructor(state, env) { this.state = state; this.env = env; }
+  async fetch(req) {
+    const b = await req.json().catch(() => ({}));
+    if (b.op === 'schedule') { await this.state.storage.put('u', b.u); await this.state.storage.setAlarm(b.at); return new Response('ok'); }
+    await this.state.storage.deleteAlarm(); return new Response('ok');
+  }
+  async alarm() { const u = await this.state.storage.get('u'); if (u) await pushAll(this.env, u); }
+}
+
 export default {
   async fetch(req, env, ctx) {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
@@ -282,6 +314,23 @@ export default {
       return json(req, { code, url: APP_URL + '?invite=' + code, exp });
     }
 
+
+    // ---- notifications de fin de repos ----
+    if (p === '/push/key' && req.method === 'GET') return json(req, { key: (await getVapid(env)).pub });
+    if (p === '/push/sub' && req.method === 'POST') {
+      const sub = body.sub; if (!sub || typeof sub.endpoint !== 'string' || !/^https:\/\//.test(sub.endpoint)) return json(req, { error: 'abonnement invalide' }, 400);
+      const L = ((await env.KV.get('push:' + me, 'json')) || []).filter(x => x.endpoint !== sub.endpoint); L.push({ endpoint: sub.endpoint }); await env.KV.put('push:' + me, JSON.stringify(L.slice(-5)));
+      return json(req, { ok: true });
+    }
+    if (p === '/push/unsub' && req.method === 'POST') { const L = ((await env.KV.get('push:' + me, 'json')) || []).filter(x => x.endpoint !== body.endpoint); await env.KV.put('push:' + me, JSON.stringify(L)); return json(req, { ok: true }); }
+    if ((p === '/push/schedule' || p === '/push/cancel') && req.method === 'POST') {
+      if (!env.TIMER) return json(req, { error: 'indisponible' }, 501);
+      const at = +body.at, stub = env.TIMER.get(env.TIMER.idFromName(me));
+      if (p === '/push/schedule' && !(at > Date.now() && at < Date.now() + 3600e3)) return json(req, { error: 'heure invalide' }, 400);
+      await stub.fetch('https://timer/', { method: 'POST', body: JSON.stringify(p === '/push/schedule' ? { op: 'schedule', u: me, at } : { op: 'cancel' }) });
+      return json(req, { ok: true });
+    }
+    if (p === '/push/test' && req.method === 'POST') return json(req, { sent: await pushAll(env, me) });
     // ---- amis et fil ----
     if (p.startsWith('/social/') && me === LEG) return json(req, { error: 'Crée d\'abord ton compte.' }, 400);
     if (p === '/social/me' && req.method === 'GET') {
