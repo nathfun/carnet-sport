@@ -16,6 +16,8 @@ const beginner = () => [
 /* ---------- quand afficher quoi ---------- */
 const needAuth = () => window.SYNC && !SY().on() && !SY().cfg().local;
 const needSetup = () => window.SYNC && SY().on() && C() && !(C().S().set || {}).sports;
+addEventListener('online', () => { if (window.CARNET && needAuth()) { err = ''; C().render(); } });
+addEventListener('offline', () => { if (window.CARNET && needAuth()) C().render(); });
 window.AUTH = {
   gate: () => needAuth() || needSetup(),
   html: () => needAuth() ? authHtml() : setupHtml(),
@@ -34,7 +36,7 @@ async function checkStatus() {
 function authHtml() {
   const old = SY().cfg().key, m = mode || (old && claimable !== false ? 'claim' : invite ? 'register' : 'login');
   const head = `<div class="au-logo">Carnet <b>sport</b></div>`;
-  const msg = err ? `<p class="au-err">${esc(err)}</p>` : SY().cfg().expired ? '<p class="au-err">Ta session a expiré : reconnecte-toi.</p>' : '';
+  const msg = !navigator.onLine ? '<p class="au-err">📵 Pas de réseau. La toute première connexion sur cet appareil a besoin d\'internet (wifi ou 4G). Ensuite, l\'app marche hors ligne, même à la salle.</p>' : err ? `<p class="au-err">${esc(err)}</p>` : SY().cfg().expired ? '<p class="au-err">Ta session a expiré : reconnecte-toi.</p>' : '';
   if (m === 'claim') return `<div class="au">${head}<div class="au-card"><h1>Nouveau : les comptes</h1>
     <p class="small">L'app passe en comptes personnels pour que ta famille et tes amis aient chacun le leur. Crée le tien : <b>toutes tes données actuelles y seront rangées</b>, et tu seras l'administrateur.</p>${msg}
     <label>Prénom<input id="au-name" value="Nathan" autocomplete="given-name"></label>
