@@ -63,7 +63,7 @@ let toolSub = 'cm';
 const FORM = { Brzycki: (w, r) => w * 36 / (37 - r), Epley: (w, r) => r === 1 ? w : w * (1 + r / 30), Lombardi: (w, r) => w * Math.pow(r, 0.1), "O'Connor": (w, r) => w * (1 + 0.025 * r) };
 const LOADS = [[95, 2, 'f'], [90, 3, 'f'], [85, 6, 'f'], [80, 8, 'h'], [75, 10, 'h'], [70, 12, 'h'], [65, 16, 'e'], [60, 20, 'e'], [55, 22, 'e'], [50, 25, 'e']];
 const ZN = { f: ['Force', 'z-f'], h: ['Hypertrophie', 'z-h'], e: ['Endurance', 'z-e'] };
-const PLATES = [[25, '#d7263d', 100], [20, '#2f5bea', 92], [15, '#f0b429', 82], [10, '#1f9d55', 72], [5, '#f4f4f4', 58], [2.5, '#c0392b', 46], [1.25, '#9aa0a6', 38]];
+const PLATES = [[20, '#2f5bea', 100], [15, '#f0b429', 82], [10, '#1f9d55', 72], [5, '#f4f4f4', 58], [2.5, '#c0392b', 46], [1.25, '#9aa0a6', 38]];
 function barbell(total) {
   let side = Math.max(0, (total - 20) / 2); const used = [];
   for (const [kg, col, h] of PLATES) while (side >= kg - 1e-6) { used.push([kg, col, h]); side -= kg; }
@@ -72,25 +72,44 @@ function barbell(total) {
   pl = draw(1) + draw(-1);
   return { svg: `<svg viewBox="0 0 ${W} ${H}" class="barbell" role="img" aria-label="Barre chargée à ${fr(total, 1)} kg"><rect x="8" y="${H / 2 - 3}" width="${W - 16}" height="6" rx="3" fill="#8b9099"/><rect x="${cx - 74}" y="${H / 2 - 9}" width="6" height="18" rx="2" fill="#6b7078"/><rect x="${cx + 68}" y="${H / 2 - 9}" width="6" height="18" rx="2" fill="#6b7078"/>${pl}</svg>`, used: used.map(u => u[0]) };
 }
+function stackSvg(total, step) {
+  const sel = Math.max(1, Math.round(total / step)), n = Math.min(40, Math.max(16, sel + 3)), W = 300, H = 150, ph = 128 / n;
+  let r = ''; for (let i = 0; i < n; i++) { const y = 12 + i * ph, on = i < sel; r += `<rect x="110" y="${y.toFixed(1)}" width="80" height="${(ph * .8).toFixed(1)}" rx="1.5" fill="${on ? 'var(--acc)' : '#c9ccd2'}" opacity="${on ? 1 : .55}"/>`; }
+  const py = 12 + (sel - 1) * ph + ph * .4;
+  return `<svg viewBox="0 0 ${W} ${H}" class="barbell" role="img" aria-label="Pile de poids"><rect x="146" y="2" width="8" height="${146}" rx="3" fill="#8b9099"/>${r}<rect x="186" y="${py - 2}" width="34" height="5" rx="2.5" fill="#111"/><circle cx="222" cy="${py + .5}" r="5" fill="#111"/><text x="232" y="${py + 5}" font-size="13" font-weight="800" fill="currentColor">${fr(sel * step, 0)} kg</text></svg>`;
+}
+function dbSvg(kg) {
+  const one = x => `<g transform="translate(${x},0)"><rect x="0" y="36" width="16" height="48" rx="4" fill="#2b2f36"/><rect x="18" y="30" width="12" height="60" rx="4" fill="#3a3f48"/><rect x="30" y="55" width="60" height="10" rx="5" fill="#8b9099"/><rect x="90" y="30" width="12" height="60" rx="4" fill="#3a3f48"/><rect x="104" y="36" width="16" height="48" rx="4" fill="#2b2f36"/></g>`;
+  return `<svg viewBox="0 0 300 120" class="barbell" role="img" aria-label="Deux haltères">${one(20)}${one(160)}<text x="150" y="112" text-anchor="middle" font-size="13" font-weight="800" fill="currentColor">${fr(kg, kg % 1 ? 1 : 0)} kg par haltère</text></svg>`;
+}
+const plTxt = L => L.length ? L.map(p => p === 1.25 ? '1,25' : String(p).replace('.', ',')).join(' + ') + ' kg' : 'rien';
+function equipViz(eq, e1) {
+  if (eq === 'M' || eq === 'P') { const tot = Math.round(e1 / 5) * 5; return { title: eq === 'M' ? 'Ton 1RM sur la machine' : 'Ton 1RM à la poulie', svg: stackSvg(e1, 5), txt: `Mets la goupille au plus près de ${fr(tot, 0)} kg. Les piles vont souvent de 5 en 5 kg (parfois 7 kg selon la machine) : prends la plaque la plus proche.` }; }
+  if (eq === 'H' || eq === 'K') { const kg = Math.round(e1 / 2) * 2; return { title: eq === 'H' ? 'Ton 1RM aux haltères' : 'Ton 1RM au kettlebell', svg: dbSvg(kg), txt: `Charge par ${eq === 'H' ? 'haltère' : 'kettlebell'} (les haltères vont souvent de 2 en 2 kg).` }; }
+  if (eq === 'C' || eq === 'E') return { title: 'Exercice au poids du corps', svg: '', txt: 'Ici, la charge correspond au lest que tu ajoutes (ceinture, gilet). Sans lest, regarde plutôt ton nombre de répétitions.' };
+  const tot = Math.ceil(e1 / 2.5) * 2.5, bb = barbell(tot);
+  return { title: eq === 'S' ? 'Ton 1RM à la Smith machine' : 'Ton 1RM sur la barre', svg: bb.svg, txt: eq === 'S' ? `Pour ${fr(tot, 1)} kg : ${plTxt(bb.used)} de chaque côté avec une barre de 20 kg. La barre guidée pèse souvent moins (souvent 7 à 15 kg) : regarde l'étiquette de la machine.` : `Pour ${fr(tot, 1)} kg : barre de 20 kg + ${plTxt(bb.used)} de chaque côté (disques de 20 kg au maximum).` };
+}
 function vCharge() {
   const t = T(), cm = t.cm, REC = C().REC(), recs = [...REC.values()].sort((a, b) => a.n.localeCompare(b.n, 'fr'));
   const vals = Object.fromEntries(Object.entries(FORM).map(([k, f]) => [k, half(f(cm.w, cm.r))]));
   const e1 = vals.Epley, lo = Math.min(...Object.values(vals)), hi = Math.max(...Object.values(vals));
-  const bb = barbell(q25(Math.ceil(e1 / 2.5) * 2.5)), tot = Math.ceil(e1 / 2.5) * 2.5;
+  const exN = cm.ex ? (C().allEx().get(cm.ex) || {}).n || (REC.get(cm.ex) || {}).n : '', eq = cm.ex ? (C().metaOf(cm.ex) || {}).eq : 'B', viz = equipViz(eq, e1);
   const fmax = Math.max(...Object.values(vals));
   const warm = [[40, 8], [55, 5], [70, 3], [80, 1]].map(([p, r]) => [p, q25(e1 * p / 100), r]);
   return `<p class="lede">Une charge, un nombre de répétitions : ton 1RM estimé et tes charges pour la force, la masse ou l'endurance.</p>
-  ${recs.length ? `<label class="lbl">Partir d'un de mes records<select data-t="cmex"><option value="">Saisie libre</option>${recs.map(R => `<option value="${esc(R.id)}" ${cm.ex === R.id ? 'selected' : ''}>${esc(R.n)} · ${fr(R.kg, 1)} kg × ${R.r || 1}</option>`).join('')}</select></label>` : ''}
+  <label class="lbl">Quel exercice ?<select data-t="cmex"><option value="">Choisis un exercice…</option>${recs.length ? `<optgroup label="Mes records">${recs.map(R => `<option value="${esc(R.id)}" ${cm.ex === R.id ? 'selected' : ''}>${esc(R.n)} · ${fr(R.kg, 1)} kg × ${R.r || 1}</option>`).join('')}</optgroup>` : ''}${(window.MUSCLES || []).map(m => { const L = [...C().allEx().values()].filter(e => C().metaOf(e.id).m === m && !REC.has(e.id)).sort((a, b) => a.n.localeCompare(b.n, 'fr')); return L.length ? `<optgroup label="${esc(m)}">${L.map(e => `<option value="${esc(e.id)}" ${cm.ex === e.id ? 'selected' : ''}>${esc(e.n)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select></label>
+  ${cm.ex ? '' : '<p class="tiny">Choisis l\'exercice : l\'affichage s\'adapte (barre et disques, pile de la machine, haltères).</p>'}
   <div class="tool-grid">
     <div class="tcard">
       <div class="eyebrow">Charge soulevée</div>${stepper('cmw', fr(cm.w, cm.w % 1 ? 1 : 0), ' kg')}
       <div class="eyebrow" style="margin-top:14px">Répétitions faites</div>
       <div class="chips12">${Array.from({ length: 12 }, (_, i) => `<button class="${cm.r === i + 1 ? 'sel' : ''}" data-t="cmr" data-v="${i + 1}">${i + 1}</button>`).join('')}</div>
-      <div class="eyebrow" style="margin-top:14px">Ton 1RM sur la barre</div>
-      <div class="barbox">${bb.svg}<p class="tiny">Pour ${fr(tot, 1)} kg : barre de 20 kg + ${bb.used.map(p => fr(p, p % 1 ? 2 : 0).replace(',00', '')).join(', ') || 'rien'} de chaque côté</p></div>
+      <div class="eyebrow" style="margin-top:14px">${viz.title}</div>
+      <div class="barbox">${viz.svg}<p class="tiny">${viz.txt}</p></div>
     </div>
     <div class="tcard hero-cm">
-      <div class="eyebrow dot">Ton 1RM estimé</div>
+      <div class="eyebrow dot">Ton 1RM estimé${exN ? ' · ' + esc(exN) : ''}</div>
       <div class="bignum">${cu('cm-e1', e1, e1 % 1 ? 1 : 1)}<small>kg</small></div>
       <p class="small">Tu pourrais soulever environ ${fr(e1, 1)} kg une seule fois. Les 4 formules donnent ${fr(lo, 1)} à ${fr(hi, 1)} kg :</p>
       ${Object.entries(vals).map(([k, v], i) => `<div class="fbar ${k === 'Epley' ? 'on' : ''}"><span>${k}</span><div><i ${aw('cm-f' + i, v / fmax * 100)}></i></div><b>${fr(v, 1)}</b></div>`).join('')}
@@ -106,7 +125,7 @@ function vCharge() {
   </div>
   <h2 class="h2t">Ton échauffement</h2><p class="sub2">Avant ta série de travail : quatre paliers, sans te fatiguer.</p>
   <div class="stairs">${warm.map(([p, kg, r], i) => `<div class="stair"><div class="sfill" ${aw('cm-w' + i, 38 + i * 12, 'height')}><small>${p} %</small><b>${fr(kg, kg % 1 ? 1 : 0)}</b><small>× ${r}</small></div></div>`).join('')}<div class="stair"><div class="sfill top" ${aw('cm-w4', 100, 'height')}><small>Série</small><b>${fr(cm.w, cm.w % 1 ? 1 : 0)}</b><small>× ${cm.r}${cm.r < 12 ? ' à ' + (cm.r + 1) : ''}</small></div></div></div>
-  <p class="tiny" style="margin-top:12px">Sur machine guidée, prends la plaque la plus proche de la charge indiquée.</p>`;
+  <p class="tiny" style="margin-top:12px">${eq === 'M' || eq === 'P' ? 'Sur machine, prends la plaque la plus proche de la charge indiquée.' : eq === 'H' ? 'Aux haltères, les charges sont par haltère.' : 'Arrondis au disque le plus proche.'}</p>`;
 }
 
 /* ================= CALORIES ================= */
@@ -257,8 +276,8 @@ document.addEventListener('click', e => {
   const S = C().S(); T(); const cm = S.tools.cm, c = S.tools.cal, a = S.tools.al, d = +btn.dataset.d || 0, v = btn.dataset.v;
   switch (btn.dataset.t) {
     case 'tsub': toolSub = v; C().render(); window.scrollTo(0, 0); return;
-    case 'cmw': cm.w = clamp(cm.w + d * 2.5, 2.5, 500); cm.ex = ''; break;
-    case 'cmr': cm.r = +v; cm.ex = ''; break;
+    case 'cmw': cm.w = clamp(cm.w + d * 2.5, 2.5, 500); break;
+    case 'cmr': cm.r = +v; break;
     case 'csex': c.sex = v; break;
     case 'cneat': c.neat = v; break;
     case 'csess': c.sess = clamp(c.sess + d, 0, 14); break;
@@ -283,7 +302,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target; if (!window.CARNET) return;
-  if (t.dataset.t === 'cmex') { const S = C().S(), R = C().REC().get(t.value); S.tools.cm.ex = t.value; if (R) { S.tools.cm.w = R.kg; S.tools.cm.r = Math.min(12, Math.max(1, R.r || 1)); } C().save(); C().render(); }
+  if (t.dataset.t === 'cmex') { const S = C().S(), R = C().REC().get(t.value); S.tools.cm.ex = t.value; if (R) { S.tools.cm.w = R.kg; S.tools.cm.r = Math.min(12, Math.max(1, R.r || 1)); } else if (t.value) { const L = C().lastSets ? C().lastSets(t.value) : null, b = L && L.filter(x => x.t !== 'e').sort((a, c) => (+c.kg || 0) - (+a.kg || 0))[0]; if (b && +b.kg) { S.tools.cm.w = +b.kg; S.tools.cm.r = Math.min(12, Math.max(1, +b.r || 5)); } } C().save(); C().render(); }
   else if (t.dataset.tin) { const S = C().S(), k = t.dataset.tin; if (k === 'bf') S.tools.cal.bf = Math.min(60, Math.max(0, parseFloat(String(t.value).replace(',', '.')) || 0)) || ''; else if (k === 'pdist') S.tools.al.pdist = parseFloat(String(t.value).replace(',', '.')) || 10; else if (k === 'ptime') S.tools.al.ptime = t.value.trim(); C().save(); C().render(); }
 });
 }
